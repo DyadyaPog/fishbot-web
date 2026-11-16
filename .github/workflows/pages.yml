@@ -1,5 +1,6 @@
 # Публикация статической страницы кабинета игрока на GitHub Pages.
-# Сборка не требуется: репозиторий и есть готовый сайт.
+# Сборка не требуется: workflow копирует в артефакт только файлы сайта
+# (index.html, config.js, assets/), поэтому README и папка supabase/ на Pages не попадают.
 
 name: Deploy player page to GitHub Pages
 
@@ -32,6 +33,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # Если заданы repository variables, подставляем реальные адрес и ключ Supabase.
+      # Без них страница публикуется с пустыми значениями и работает в демо-режиме.
       - name: Inject Supabase config (optional)
         if: ${{ vars.SUPABASE_URL != '' && vars.SUPABASE_ANON_KEY != '' }}
         run: |
@@ -39,10 +42,20 @@ jobs:
           window.FISHBOT_CONFIG = {
               supabaseUrl: '${{ vars.SUPABASE_URL }}',
               supabaseAnonKey: '${{ vars.SUPABASE_ANON_KEY }}',
-              channel: '${{ vars.FISHBOT_CHANNEL }}',
-              schemaVersion: 1
+              schemaVersion: 2
           };
           CONFIG
+
+      # Собираем чистый артефакт: только то, что должно быть доступно посетителю.
+      - name: Stage site files
+        run: |
+          mkdir -p _site
+          cp index.html config.js _site/
+          cp -r assets _site/
+          test -f _site/index.html
+          test -f _site/config.js
+          test -f _site/assets/app.js
+          test -f _site/assets/style.css
 
       - name: Configure Pages
         uses: actions/configure-pages@v5
@@ -50,7 +63,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: '.'
+          path: '_site'
 
       - name: Deploy
         id: deployment

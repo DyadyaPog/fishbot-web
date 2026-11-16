@@ -44,6 +44,10 @@
                 <div class="status-indicator status offline" id="auth-status">Гостевой режим</div>
             </div>
             <div class="header-actions">
+                <label class="channel-picker" id="channel-picker" hidden>
+                    <span class="channel-picker-label">Канал</span>
+                    <select id="channel-select" onchange="selectChannel(this.value)"></select>
+                </label>
                 <div class="user-chip" id="user-chip" hidden>
                     <span class="user-chip-avatar" id="user-chip-avatar">🐟</span>
                     <span id="user-chip-name">—</span>
@@ -66,8 +70,9 @@
                 <h2>Кабинет рыболова</h2>
                 <p>
                     Войдите через Twitch, чтобы увидеть свой баланс, уровень, инвентарь и экипировку.
-                    Данные читаются из общей базы бота; управлять можно снаряжением — надеть или снять
-                    удочку, леску, крючок и наживку.
+                    Если вы рыбачили на нескольких каналах, в шапке появится выбор канала: статистика
+                    и инвентарь у каждого свои. Управлять можно снаряжением — надеть или снять удочку,
+                    леску, крючок и наживку.
                 </p>
                 <div class="guest-hero-actions">
                     <button class="btn-twitch" onclick="handleLogin()">
@@ -179,7 +184,7 @@
         <section id="rankings" class="tab-content">
             <div class="dashboard-panel animate-up">
                 <div class="panel-header">
-                    <div class="panel-title"><span class="panel-icon">🏆</span> Рейтинг канала</div>
+                    <div class="panel-title"><span class="panel-icon">🏆</span> Рейтинг канала <span class="panel-channel" id="ranking-channel"></span></div>
                 </div>
                 <div class="ranking-list" id="ranking-list"></div>
                 <p class="admin-hint" style="margin-top: 1rem;">
