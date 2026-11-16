@@ -1,0 +1,57 @@
+# Публикация статической страницы кабинета игрока на GitHub Pages.
+# Сборка не требуется: репозиторий и есть готовый сайт.
+
+name: Deploy player page to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'index.html'
+      - 'config.js'
+      - 'assets/**'
+      - '.github/workflows/pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Inject Supabase config (optional)
+        if: ${{ vars.SUPABASE_URL != '' && vars.SUPABASE_ANON_KEY != '' }}
+        run: |
+          cat > config.js <<CONFIG
+          window.FISHBOT_CONFIG = {
+              supabaseUrl: '${{ vars.SUPABASE_URL }}',
+              supabaseAnonKey: '${{ vars.SUPABASE_ANON_KEY }}',
+              channel: '${{ vars.FISHBOT_CHANNEL }}',
+              schemaVersion: 1
+          };
+          CONFIG
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

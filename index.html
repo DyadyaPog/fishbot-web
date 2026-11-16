@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FishBot — Кабинет игрока</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="assets/style.css">
+</head>
+<body>
+    <div class="bg-glow glow-1"></div>
+    <div class="bg-glow glow-2"></div>
+    <div class="bg-glow glow-3"></div>
+
+    <nav class="sidebar">
+        <div class="logo-container">
+            <span class="logo-icon">🎣</span>
+            <div class="logo-text">Fish<span>Bot</span></div>
+        </div>
+
+        <div class="nav-section-label">Кабинет</div>
+        <ul class="nav-links">
+            <li><button onclick="showTab('profile')" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
+            <li><button onclick="showTab('inventory')" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
+            <li><button onclick="showTab('loadout')" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
+        </ul>
+
+        <div class="nav-section-label">Twitch</div>
+        <ul class="nav-links">
+            <li><button onclick="showTab('rankings')" id="btn-rankings"><span class="nav-icon">🏆</span><span>Рейтинг</span></button></li>
+        </ul>
+
+        <div class="sidebar-footer">
+            <div class="version-tag">player cabinet · pre-alpha</div>
+        </div>
+    </nav>
+
+    <main class="content">
+        <header class="main-header">
+            <div class="header-info">
+                <h1 id="page-title">Профиль</h1>
+                <div class="status-indicator status offline" id="auth-status">Гостевой режим</div>
+            </div>
+            <div class="header-actions">
+                <div class="user-chip" id="user-chip" hidden>
+                    <span class="user-chip-avatar" id="user-chip-avatar">🐟</span>
+                    <span id="user-chip-name">—</span>
+                </div>
+                <button class="btn-action btn-start" id="btn-demo" onclick="toggleDemo()">Демо-режим</button>
+                <button class="btn-action btn-stop" id="btn-login" onclick="handleLogin()">Войти через Twitch</button>
+            </div>
+        </header>
+
+        <div class="notice notice-warn" id="setup-notice" hidden>
+            Заготовка страницы. Supabase ещё не подключён: укажите <code>supabaseUrl</code> и
+            <code>supabaseAnonKey</code> в <code>config.js</code>, включите провайдер Twitch в Supabase
+            и добавьте адрес этой страницы в разрешённые redirect URL. До этого доступен только демо-режим.
+        </div>
+
+        <!-- ГОСТЬ -->
+        <section id="guest" class="tab-content active">
+            <div class="guest-hero animate-up">
+                <div class="guest-hero-icon">🎣</div>
+                <h2>Кабинет рыболова</h2>
+                <p>
+                    Войдите через Twitch, чтобы увидеть свой баланс, уровень, инвентарь и экипировку.
+                    Данные читаются из общей базы бота; управлять можно снаряжением — надеть или снять
+                    удочку, леску, крючок и наживку.
+                </p>
+                <div class="guest-hero-actions">
+                    <button class="btn-twitch" onclick="handleLogin()">
+                        <span>🟣</span><span>Войти через Twitch</span>
+                    </button>
+                    <button class="btn-ghost" onclick="toggleDemo()">Посмотреть демо</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ПРОФИЛЬ -->
+        <section id="profile" class="tab-content">
+            <div class="stats-grid">
+                <div class="stat-card animate-up">
+                    <div class="stat-card-icon">💰</div>
+                    <div>
+                        <div class="stat-label">Баланс</div>
+                        <div class="stat-value" id="stat-balance">0</div>
+                    </div>
+                </div>
+                <div class="stat-card animate-up" style="animation-delay: 0.1s;">
+                    <div class="stat-card-icon">⭐</div>
+                    <div>
+                        <div class="stat-label">Уровень</div>
+                        <div class="stat-value" id="stat-level">1</div>
+                    </div>
+                </div>
+                <div class="stat-card animate-up" style="animation-delay: 0.2s;">
+                    <div class="stat-card-icon">🐟</div>
+                    <div>
+                        <div class="stat-label">Поймано</div>
+                        <div class="stat-value" id="stat-fish">0</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="dashboard-layout">
+                <div class="dashboard-panel animate-up">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="panel-icon">📈</span> Прогресс</div>
+                    </div>
+                    <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width: 0%"></div></div>
+                    <div class="xp-caption">
+                        <span id="xp-current">0 XP</span>
+                        <span id="xp-next">до следующего уровня</span>
+                    </div>
+                    <p class="admin-hint" style="margin-top: 1rem;">
+                        Полоса опыта — заготовка: точный порог уровня считается формулой бота.
+                    </p>
+                </div>
+
+                <div class="dashboard-panel animate-up" style="grid-column: span 2;">
+                    <div class="panel-header">
+                        <div class="panel-title"><span class="panel-icon">🎣</span> Последние уловы</div>
+                    </div>
+                    <div id="recent-catches" class="catches-container"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ИНВЕНТАРЬ -->
+        <section id="inventory" class="tab-content">
+            <div class="filters-row">
+                <select id="filter-type" onchange="setFilter('type', this.value)">
+                    <option value="all">Все типы</option>
+                    <option value="ROD">Удочки</option>
+                    <option value="LINE">Лески</option>
+                    <option value="HOOK">Крючки</option>
+                    <option value="BAIT">Наживки</option>
+                    <option value="FISH">Рыба</option>
+                    <option value="ARTIFACT">Артефакты</option>
+                    <option value="CONSUMABLE">Расходники</option>
+                </select>
+                <select id="filter-rarity" onchange="setFilter('rarity', this.value)">
+                    <option value="all">Все редкости</option>
+                    <option value="common">common</option>
+                    <option value="uncommon">uncommon</option>
+                    <option value="rare">rare</option>
+                    <option value="epic">epic</option>
+                    <option value="legendary">legendary</option>
+                    <option value="mythic">mythic</option>
+                    <option value="trash">trash</option>
+                    <option value="treasure">treasure</option>
+                </select>
+                <input type="search" id="filter-search" placeholder="Поиск по названию" oninput="setFilter('q', this.value)">
+                <span class="inventory-counter" id="inventory-counter">0 предметов</span>
+            </div>
+
+            <div id="inventory-grid" class="inventory-grid"></div>
+        </section>
+
+        <!-- ЭКИПИРОВКА -->
+        <section id="loadout" class="tab-content">
+            <div class="slot-grid" id="slot-grid"></div>
+
+            <div class="dashboard-panel animate-up">
+                <div class="panel-header">
+                    <div class="panel-title"><span class="panel-icon">🛠️</span> Как это работает</div>
+                </div>
+                <p class="admin-hint">
+                    Надеть можно по одному предмету каждого типа: удочка, леска, крючок, наживка.
+                    Действия меняют флаг <code>is_equipped</code> у строки инвентаря в Supabase и сразу
+                    учитываются ботом в следующей рыбалке.
+                </p>
+            </div>
+        </section>
+
+        <!-- РЕЙТИНГ -->
+        <section id="rankings" class="tab-content">
+            <div class="dashboard-panel animate-up">
+                <div class="panel-header">
+                    <div class="panel-title"><span class="panel-icon">🏆</span> Рейтинг канала</div>
+                </div>
+                <div class="ranking-list" id="ranking-list"></div>
+                <p class="admin-hint" style="margin-top: 1rem;">
+                    Заготовка: список придёт из Supabase-представления с топом по балансу и уровню.
+                </p>
+            </div>
+        </section>
+    </main>
+
+    <div class="toast" id="toast"></div>
+
+    <script src="config.js"></script>
+    <script src="assets/app.js"></script>
+</body>
+</html>
