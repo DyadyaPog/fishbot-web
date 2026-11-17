@@ -1551,6 +1551,8 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     margin-top: auto;
     padding-top: 0.4rem;
     flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
 }
 
 .empty-state {
