@@ -18,6 +18,136 @@ comment on column items.max_uses is
     'Заряды нового экземпляра снаряжения: -1 — без ограничения, null — не расходуется.';
 
 -- ---------------------------------------------------------------------------
+-- upsert_item_inventory(): общая запись предмета в инвентарь.
+--
+-- Заряды, метаданные и стекинг считаются здесь, чтобы правила прочности
+-- не расходились между покупкой (!buy) и админской выдачей. Возвращает
+-- jsonb с ok, inventoryId, meta, uses, existed (или кодом ошибки).
+-- ---------------------------------------------------------------------------
+create or replace function upsert_item_inventory(
+    p_channel_id bigint,
+    p_user_id    bigint,
+    p_item       items,
+    p_quantity   integer,
+    p_message_id text default null
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+    v_row     inventory%rowtype;
+    v_exists  boolean := false;
+    v_qty     integer := least(999, greatest(1, coalesce(p_quantity, 1)));
+    v_uses    numeric;
+    v_meta    jsonb;
+    v_id      bigint;
+begin
+    if p_item.kind in ('rod', 'line', 'hook', 'bait')
+       and p_item.max_uses is null then
+        return jsonb_build_object(
+            'ok', false,
+            'code', 'missing_max_uses',
+            'error', format(
+                'У снаряжения «%s» не заданы заряды: каталог items не синхронизирован ботом (max_uses is null).',
+                p_item.name
+            ),
+            'itemId', p_item.id
+        );
+    end if;
+
+    if p_item.kind = 'consumable' then
+        v_meta := jsonb_strip_nulls(jsonb_build_object(
+            'name', p_item.name,
+            'description', p_item.description,
+            'rarity', p_item.rarity
+        ));
+        v_uses := null;
+    else
+        if p_item.max_uses = -1 then
+            v_uses := -1;
+        else
+            v_uses := p_item.max_uses * v_qty;
+        end if;
+
+        v_meta := jsonb_strip_nulls(jsonb_build_object(
+            'name', p_item.name,
+            'price', p_item.price,
+            'rarity', p_item.rarity,
+            'uses', v_uses,
+            'max_uses', p_item.max_uses
+        ));
+    end if;
+
+    select * into v_row
+    from inventory
+    where channel_id = p_channel_id
+      and user_id = p_user_id
+      and item_id = p_item.id
+      and item_type = p_item.kind
+    order by id
+    limit 1;
+
+    v_exists := found;
+
+    if v_exists then
+        v_meta := coalesce(v_row.meta, '{}'::jsonb) || v_meta;
+
+        if p_item.kind in ('rod', 'line', 'hook', 'bait')
+           and p_item.max_uses is not null
+           and p_item.max_uses > 0
+           and jsonb_typeof(coalesce(v_row.meta, '{}'::jsonb) -> 'uses') = 'number'
+           and ((v_row.meta ->> 'uses')::numeric) <> -1 then
+            v_uses := ((v_row.meta ->> 'uses')::numeric) + p_item.max_uses * v_qty;
+            v_meta := jsonb_set(v_meta, '{uses}', to_jsonb(v_uses));
+        end if;
+
+        update inventory
+        set quantity = quantity + v_qty,
+            meta = v_meta,
+            updated_at = now()
+        where id = v_row.id;
+
+        v_id := v_row.id;
+    else
+        insert into inventory (
+            channel_id,
+            user_id,
+            item_id,
+            item_type,
+            quantity,
+            meta,
+            origin_event_id
+        )
+        values (
+            p_channel_id,
+            p_user_id,
+            p_item.id,
+            p_item.kind,
+            v_qty,
+            v_meta,
+            nullif(p_message_id, '')
+        )
+        returning id into v_id;
+    end if;
+
+    return jsonb_build_object(
+        'ok', true,
+        'inventoryId', v_id,
+        'meta', v_meta,
+        'uses', v_uses,
+        'existed', v_exists
+    );
+end $$;
+
+comment on function upsert_item_inventory(bigint, bigint, items, integer, text) is
+    'Общая запись предмета в инвентарь: заряды, метаданные, стекинг.';
+
+revoke all on function upsert_item_inventory(bigint, bigint, items, integer, text) from public;
+grant execute on function upsert_item_inventory(bigint, bigint, items, integer, text) to service_role;
+
+-- ---------------------------------------------------------------------------
 -- buy_item(): покупка снаряжения
 -- ---------------------------------------------------------------------------
 -- p_inventory_limit передаёт бот: лимит слотов зависит от уровня, артефактов
@@ -58,6 +188,7 @@ declare
     v_uses         numeric;
     v_meta         jsonb;
     v_inventory_id bigint;
+    v_result       jsonb;
 begin
     if p_channel_id is null or p_item_id is null or btrim(p_item_id) = '' then
         return jsonb_build_object(
@@ -115,20 +246,6 @@ begin
             'ok', false,
             'code', 'starter',
             'error', format('Предмет «%s» является стартовым и не может быть куплен.', v_item.name)
-        );
-    end if;
-
-    -- Заряды берутся из items: если их нет, каталог ещё не синхронизирован
-    -- ботом и предмет мог стать «вечным» (max_uses = null). Покупка запрещена.
-    if v_item.max_uses is null then
-        return jsonb_build_object(
-            'ok', false,
-            'code', 'missing_max_uses',
-            'error', format(
-                'У снаряжения «%s» не заданы заряды: каталог items не синхронизирован ботом (max_uses is null).',
-                v_item.name
-            ),
-            'itemId', v_item.id
         );
     end if;
 
@@ -217,70 +334,27 @@ begin
         );
     end if;
 
-    -- Заряды покупки: quantity экземпляров по max_uses зарядов.
-    -- -1 значит «без ограничения» и остаётся -1, а не умножается на количество.
-    if v_item.max_uses is null then
-        v_uses := null;
-    elsif v_item.max_uses = -1 then
-        v_uses := -1;
-    else
-        v_uses := v_item.max_uses * v_qty;
+    -- Заряды, метаданные и стекинг — в общей функции upsert_item_inventory.
+    v_result := upsert_item_inventory(
+        p_channel_id, v_user_id, v_item, v_qty, nullif(p_message_id, '')
+    );
+
+    if not (v_result->>'ok')::boolean then
+        return v_result;
     end if;
 
-    v_meta := jsonb_strip_nulls(jsonb_build_object(
-        'name', v_item.name,
-        'price', v_price,
-        'rarity', v_item.rarity,
-        'uses', v_uses,
-        'max_uses', v_item.max_uses
-    ));
+    v_inventory_id := (v_result->>'inventoryId')::bigint;
+    v_uses := case
+        when v_result->>'uses' is null then null
+        else (v_result->>'uses')::numeric
+    end;
 
+    -- Деньги списываем только после успешной записи в инвентарь.
     update players
     set balance = balance - v_total
     where channel_id = p_channel_id
       and user_id = v_user_id
     returning balance into v_balance;
-
-    if v_exists then
-        -- Докупаем в ту же строку и суммируем заряды, как !buy раньше.
-        v_meta := coalesce(v_row.meta, '{}'::jsonb) || v_meta;
-
-        if v_item.max_uses is not null
-           and v_item.max_uses > 0
-           and jsonb_typeof(coalesce(v_row.meta, '{}'::jsonb) -> 'uses') = 'number'
-           and ((v_row.meta ->> 'uses')::numeric) <> -1 then
-            v_uses := ((v_row.meta ->> 'uses')::numeric) + v_item.max_uses * v_qty;
-            v_meta := jsonb_set(v_meta, '{uses}', to_jsonb(v_uses));
-        end if;
-
-        update inventory
-        set quantity = quantity + v_qty,
-            meta = v_meta,
-            updated_at = now()
-        where id = v_row.id;
-
-        v_inventory_id := v_row.id;
-    else
-        insert into inventory (
-            channel_id,
-            user_id,
-            item_id,
-            item_type,
-            quantity,
-            meta,
-            origin_event_id
-        )
-        values (
-            p_channel_id,
-            v_user_id,
-            v_item.id,
-            v_item.kind,
-            v_qty,
-            v_meta,
-            nullif(p_message_id, '')
-        )
-        returning id into v_inventory_id;
-    end if;
 
     -- Снаряжение надевается сразу: сначала снимаем предмет того же слота,
     -- иначе уникальный индекс надетых предметов не даст записать новый.
@@ -374,6 +448,7 @@ declare
     v_uses         numeric;
     v_meta         jsonb;
     v_inventory_id bigint;
+    v_result       jsonb;
 begin
     if coalesce(v_role, '') <> 'service_role' then
         raise exception 'выдача предметов доступна только service_role'
@@ -406,21 +481,6 @@ begin
         );
     end if;
 
-    -- Снаряжение без зарядов в items — каталог не синхронизирован ботом,
-    -- выдача запрещена, чтобы не создать «вечный» предмет.
-    if v_item.kind in ('rod', 'line', 'hook', 'bait')
-       and v_item.max_uses is null then
-        return jsonb_build_object(
-            'ok', false,
-            'code', 'missing_max_uses',
-            'error', format(
-                'У снаряжения «%s» не заданы заряды: каталог items не синхронизирован ботом (max_uses is null).',
-                v_item.name
-            ),
-            'itemId', v_item.id
-        );
-    end if;
-
     select * into v_player
     from players
     where channel_id = p_channel_id
@@ -435,80 +495,20 @@ begin
         );
     end if;
 
-    if v_item.kind = 'consumable' then
-        v_meta := jsonb_strip_nulls(jsonb_build_object(
-            'name', v_item.name,
-            'description', v_item.description,
-            'rarity', v_item.rarity
-        ));
-    else
-        if v_item.max_uses is null then
-            v_uses := null;
-        elsif v_item.max_uses = -1 then
-            v_uses := -1;
-        else
-            v_uses := v_item.max_uses * v_qty;
-        end if;
+    -- Заряды, метаданные и стекинг — в общей функции upsert_item_inventory.
+    v_result := upsert_item_inventory(
+        p_channel_id, p_user_id, v_item, v_qty, nullif(p_message_id, '')
+    );
 
-        v_meta := jsonb_strip_nulls(jsonb_build_object(
-            'name', v_item.name,
-            'price', v_item.price,
-            'rarity', v_item.rarity,
-            'uses', v_uses,
-            'max_uses', v_item.max_uses
-        ));
+    if not (v_result->>'ok')::boolean then
+        return v_result;
     end if;
 
-    select * into v_row
-    from inventory
-    where channel_id = p_channel_id
-      and user_id = p_user_id
-      and item_id = v_item.id
-      and item_type = v_item.kind
-    order by id
-    limit 1;
-
-    v_exists := found;
-
-    if v_exists then
-        v_meta := coalesce(v_row.meta, '{}'::jsonb) || v_meta;
-
-        if v_item.max_uses is not null
-           and v_item.max_uses > 0
-           and jsonb_typeof(coalesce(v_row.meta, '{}'::jsonb) -> 'uses') = 'number'
-           and ((v_row.meta ->> 'uses')::numeric) <> -1 then
-            v_uses := ((v_row.meta ->> 'uses')::numeric) + v_item.max_uses * v_qty;
-            v_meta := jsonb_set(v_meta, '{uses}', to_jsonb(v_uses));
-        end if;
-
-        update inventory
-        set quantity = quantity + v_qty,
-            meta = v_meta,
-            updated_at = now()
-        where id = v_row.id;
-
-        v_inventory_id := v_row.id;
-    else
-        insert into inventory (
-            channel_id,
-            user_id,
-            item_id,
-            item_type,
-            quantity,
-            meta,
-            origin_event_id
-        )
-        values (
-            p_channel_id,
-            p_user_id,
-            v_item.id,
-            v_item.kind,
-            v_qty,
-            v_meta,
-            nullif(p_message_id, '')
-        )
-        returning id into v_inventory_id;
-    end if;
+    v_inventory_id := (v_result->>'inventoryId')::bigint;
+    v_uses := case
+        when v_result->>'uses' is null then null
+        else (v_result->>'uses')::numeric
+    end;
 
     insert into events (channel_id, user_id, type, message_id, payload)
     values (
