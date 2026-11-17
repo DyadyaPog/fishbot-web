@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('05_check_levels.sql', true);
+
 -- ============================================================================
 -- Шаг 5, проверка функций уровня.
 --
@@ -65,3 +68,6 @@ from expected e
 where xp_for_level(e.lvl) <> e.xp
    or level_from_xp(e.xp) <> e.lvl
    or level_from_xp(e.xp - 1) >= e.lvl;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('05_check_levels.sql');

@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('09_views.sql');
+
 -- ============================================================================
 -- Шаг 9: представления для кабинета.
 --
@@ -72,3 +75,6 @@ revoke all on channel_ranking from anon, authenticated;
 
 grant select on my_channels     to authenticated;
 grant select on channel_ranking to authenticated;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('09_views.sql');

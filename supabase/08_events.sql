@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('08_events.sql');
+
 -- ============================================================================
 -- Шаг 8: события.
 --
@@ -46,3 +49,6 @@ create index if not exists idx_events_type
 -- Поиск события по сообщению Twitch (связка с inventory.origin_event_id).
 create index if not exists idx_events_message
     on events (channel_id, message_id);
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('08_events.sql');

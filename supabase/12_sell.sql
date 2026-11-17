@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('12_sell.sql');
+
 -- ============================================================================
 -- Шаг 12: продажа из кабинета.
 --
@@ -265,3 +268,6 @@ revoke all on function sell_item(bigint, text) from public, anon;
 grant execute on function sell_price_of(text, item_kind, jsonb, integer, timestamptz) to authenticated;
 grant execute on function inventory_sell_prices(bigint) to authenticated;
 grant execute on function sell_item(bigint, text) to authenticated;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('12_sell.sql');

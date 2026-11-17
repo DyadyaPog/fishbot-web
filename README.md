@@ -46,7 +46,7 @@ python -m http.server 4173
 window.FISHBOT_CONFIG = {
     supabaseUrl: '',        // Project URL из Supabase
     supabaseAnonKey: '',    // anon key (публичный, при настроенном RLS)
-    schemaVersion: 2        // 2 — данные разделены по каналам
+    schemaVersion: 3        // 3 — магазин читает окно из shop_state и покупает через RPC
 };
 ```
 
@@ -63,6 +63,12 @@ window.FISHBOT_CONFIG = {
   на разных каналах.
 - Схема и наполнение — SQL-скрипты в `supabase/`; данные из SQLite переносит
   `fishBot/scripts/migrate-to-supabase.mjs` (`npm run db:migrate`).
+- Шаги применяются строго по порядку номеров. Первым — `00_schema_migrations.sql`:
+  он ведёт учёт применённых файлов, и каждый следующий шаг начинается с
+  `assert_migration(...)`. Повторный запуск старого файла (например,
+  `17_buy_artifact.sql` после `23_shop_state.sql`) падает, а не откатывает
+  свежие правки. На базе, где шаги 01–23 уже есть, после `00` выполните
+  `00b_backfill_migrations.sql`, затем `24_hardening.sql`.
 - Провайдер Twitch в **Authentication → Providers**.
 - В **Authentication → URL Configuration**:
   - **Site URL** — куда Supabase вернёт вход, если адрес не разрешён. Дефолтный
@@ -75,6 +81,18 @@ window.FISHBOT_CONFIG = {
   страница читает `my_channels`, `inventory`, `catches`, `channel_ranking` под RLS.
 - RLS: игрок читает только свои строки; экипировка — через RPC `equip_item` /
   `unequip_item` с проверкой владельца.
+- `shop_state` виден только по своим каналам: чужое окно магазина не отдаётся.
+- `channel_ranking` не содержит Twitch ID — рейтинг строится по нику и балансу.
+
+## Безопасность
+
+- В `index.html` стоит строгая CSP без `'unsafe-inline'` для скриптов: обработчики
+  висят на `data-*`-атрибутах, а не в `onclick`. Свой домен Supabase нужно добавить
+  в `connect-src`, иначе запросы заблокирует браузер.
+- Изменения из кабинета лимитированы в базе (`24_hardening.sql`): 30 операций с
+  балансом и 60 операций с инвентарём в минуту, пересчёт шансов — 3 раза в 5 минут.
+  Бот работает `service_role` и под лимиты не попадает.
+- Действия админ-панели бота пишутся в `admin_audit_log`.
 
 ## Публикация
 

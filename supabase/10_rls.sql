@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('10_rls.sql');
+
 -- ============================================================================
 -- Шаг 10: RLS и функции для веба.
 --
@@ -297,3 +300,6 @@ revoke all on function unequip_item(bigint, text) from public, anon;
 grant execute on function claim_profile()       to authenticated;
 grant execute on function equip_item(bigint, text)   to authenticated;
 grant execute on function unequip_item(bigint, text) to authenticated;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('10_rls.sql');

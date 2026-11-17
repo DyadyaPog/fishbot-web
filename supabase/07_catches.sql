@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('07_catches.sql');
+
 -- ============================================================================
 -- Шаг 7: журнал уловов.
 --
@@ -35,3 +38,6 @@ create index if not exists idx_catches_player
 -- Лента канала (общая статистика, последние уловы).
 create index if not exists idx_catches_channel
     on catches (channel_id, caught_at desc);
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('07_catches.sql');

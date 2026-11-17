@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('03_channels_seed.sql', true);
+
 -- ============================================================================
 -- Шаг 3 (продолжение): строки каналов.
 --
@@ -13,3 +16,6 @@ insert into channels (id, login, display_name) values
 on conflict (id) do update set
     login        = excluded.login,
     display_name = excluded.display_name;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('03_channels_seed.sql');

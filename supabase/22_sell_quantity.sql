@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('22_sell_quantity.sql');
+
 -- ============================================================================
 -- Шаг 22: продажа с количеством и цены продажи для бота.
 --
@@ -223,3 +226,6 @@ revoke all on function sell_item(bigint, integer, text) from public, anon;
 
 grant execute on function inventory_sell_prices(bigint, bigint) to authenticated, service_role;
 grant execute on function sell_item(bigint, integer, text) to authenticated, service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('22_sell_quantity.sql');

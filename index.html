@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Строгая CSP: скрипты только свои и с CDN Supabase, без inline.
+         Сессия Supabase лежит в localStorage, поэтому XSS должен быть закрыт.
+         Если появится свой домен Supabase — добавьте его в connect-src. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com data:; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co; base-uri 'self'; form-action 'self'; object-src 'none'">
     <title>FishBot — Кабинет игрока</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -22,17 +26,17 @@
 
         <div class="nav-section-label">Кабинет</div>
         <ul class="nav-links">
-            <li><button onclick="showTab('profile')" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
-            <li><button onclick="showTab('inventory')" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
-            <li><button onclick="showTab('artifacts')" id="btn-artifacts"><span class="nav-icon">🔮</span><span>Артефакты</span></button></li>
-            <li><button onclick="showTab('shop')" id="btn-shop"><span class="nav-icon">🛒</span><span>Магазин</span><span class="nav-badge" id="shop-badge" hidden>открыт</span></button></li>
-            <li><button onclick="showTab('loadout')" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
-            <li id="nav-refresh-data" hidden><button id="btn-refresh-data" onclick="refreshAllData()"><span class="nav-icon">↻</span><span>Обновить данные</span></button></li>
+            <li><button data-tab="profile" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
+            <li><button data-tab="inventory" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
+            <li><button data-tab="artifacts" id="btn-artifacts"><span class="nav-icon">🔮</span><span>Артефакты</span></button></li>
+            <li><button data-tab="shop" id="btn-shop"><span class="nav-icon">🛒</span><span>Магазин</span><span class="nav-badge" id="shop-badge" hidden>открыт</span></button></li>
+            <li><button data-tab="loadout" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
+            <li id="nav-refresh-data" hidden><button id="btn-refresh-data" data-action="refresh-all"><span class="nav-icon">↻</span><span>Обновить данные</span></button></li>
         </ul>
 
         <div class="nav-section-label">Twitch</div>
         <ul class="nav-links">
-            <li><button onclick="showTab('rankings')" id="btn-rankings"><span class="nav-icon">🏆</span><span>Рейтинг</span></button></li>
+            <li><button data-tab="rankings" id="btn-rankings"><span class="nav-icon">🏆</span><span>Рейтинг</span></button></li>
         </ul>
 
         <div class="sidebar-footer">
@@ -49,14 +53,14 @@
             <div class="header-actions">
                 <label class="channel-picker" id="channel-picker" hidden>
                     <span class="channel-picker-label">Канал</span>
-                    <select id="channel-select" onchange="selectChannel(this.value)"></select>
+                    <select id="channel-select"></select>
                 </label>
                 <div class="user-chip" id="user-chip" hidden>
                     <span class="user-chip-avatar" id="user-chip-avatar">🐟</span>
                     <span id="user-chip-name">—</span>
                 </div>
-                <button class="btn-action btn-start" id="btn-demo" onclick="toggleDemo()">Демо-режим</button>
-                <button class="btn-action btn-stop" id="btn-login" onclick="handleLogin()">Войти через Twitch</button>
+                <button class="btn-action btn-start" id="btn-demo" data-action="demo">Демо-режим</button>
+                <button class="btn-action btn-stop" id="btn-login" data-action="login">Войти через Twitch</button>
             </div>
         </header>
 
@@ -81,10 +85,10 @@
                     леску, крючок и наживку.
                 </p>
                 <div class="guest-hero-actions">
-                    <button class="btn-twitch" onclick="handleLogin()">
+                    <button class="btn-twitch" data-action="login">
                         <span>🟣</span><span>Войти через Twitch</span>
                     </button>
-                    <button class="btn-ghost" onclick="toggleDemo()">Посмотреть демо</button>
+                    <button class="btn-ghost" data-action="demo">Посмотреть демо</button>
                 </div>
             </div>
         </section>
@@ -149,7 +153,7 @@
         <!-- ИНВЕНТАРЬ -->
         <section id="inventory" class="tab-content">
             <div class="filters-row">
-                <select id="filter-type" onchange="setFilter('type', this.value)">
+                <select id="filter-type" data-filter="type">
                     <option value="all">Все типы</option>
                     <option value="ROD">Удочки</option>
                     <option value="LINE">Лески</option>
@@ -159,7 +163,7 @@
                     <option value="ARTIFACT">Артефакты</option>
                     <option value="CONSUMABLE">Расходники</option>
                 </select>
-                <select id="filter-rarity" onchange="setFilter('rarity', this.value)">
+                <select id="filter-rarity" data-filter="rarity">
                     <option value="all">Все редкости</option>
                     <option value="common">common</option>
                     <option value="uncommon">uncommon</option>

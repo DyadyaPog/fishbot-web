@@ -2018,6 +2018,31 @@
     }
 
     function bind() {
+        /* Навигация, вход и смена канала висят здесь, а не в onclick:
+           так страница открывается со строгой CSP без 'unsafe-inline'. */
+        document.addEventListener('click', (event) => {
+            const tab = event.target.closest('[data-tab]');
+            if (tab) {
+                showTab(tab.dataset.tab);
+                return;
+            }
+
+            const action = event.target.closest('[data-action]');
+            if (!action) return;
+
+            if (action.dataset.action === 'login') handleLogin();
+            else if (action.dataset.action === 'demo') toggleDemo();
+            else if (action.dataset.action === 'refresh-all') refreshAllData();
+        });
+
+        const channelSelect = el('channel-select');
+        if (channelSelect) {
+            channelSelect.addEventListener('change', () => selectChannel(channelSelect.value));
+        }
+
+        document.querySelectorAll('[data-filter]').forEach((select) => {
+            select.addEventListener('change', () => setFilter(select.dataset.filter, select.value));
+        });
         el('inventory-grid').addEventListener('click', (event) => {
             const button = event.target.closest('[data-action="equip"], [data-action="unequip"]');
             if (!button || button.disabled) return;

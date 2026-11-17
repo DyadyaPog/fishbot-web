@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('18_admin_grant_artifact.sql');
+
 -- ============================================================================
 -- Шаг 18: админская выдача артефакта целиком в Postgres.
 --
@@ -217,3 +220,6 @@ comment on function admin_grant_artifact(text, bigint, bigint, text, text) is
 
 revoke all on function admin_grant_artifact(text, bigint, bigint, text, text) from public;
 grant execute on function admin_grant_artifact(text, bigint, bigint, text, text) to service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('18_admin_grant_artifact.sql');

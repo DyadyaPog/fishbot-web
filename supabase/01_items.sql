@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('01_items.sql');
+
 -- ============================================================================
 -- Шаг 1: типы предметов и общий справочник items.
 --
@@ -40,3 +43,6 @@ alter table if exists items add column if not exists level_required integer not 
 -- Заряды нового экземпляра снаряжения: -1 — без ограничения, null — не расходуется.
 -- Нужны RPC покупки и админской выдачи, чтобы прочность считала база.
 alter table if exists items add column if not exists max_uses integer;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('01_items.sql');

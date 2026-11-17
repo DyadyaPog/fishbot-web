@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('04_accounts.sql');
+
 -- ============================================================================
 -- Шаг 4: аккаунты.
 --
@@ -17,3 +20,6 @@ create table if not exists accounts (
 
 comment on table accounts is
     'Twitch ID ↔ Supabase Auth. auth_id заполняется при первом входе (claim_profile).';
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('04_accounts.sql');

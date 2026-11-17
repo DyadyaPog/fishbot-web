@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('14_chances_refresh.sql');
+
 -- ============================================================================
 -- Шаг 14: запросы кабинета на пересчёт шансов улова.
 --
@@ -75,3 +78,6 @@ begin
         alter publication supabase_realtime add table public.chance_refresh_requests;
     end if;
 end $$;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('14_chances_refresh.sql');

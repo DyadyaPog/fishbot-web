@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('05_players.sql');
+
 -- ============================================================================
 -- Шаг 5: игроки по каналам + функции уровня.
 --
@@ -65,3 +68,6 @@ comment on table players is
 create index if not exists idx_players_user            on players (user_id);
 -- Топ канала по балансу (для channel_ranking).
 create index if not exists idx_players_channel_balance on players (channel_id, balance desc);
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('05_players.sql');

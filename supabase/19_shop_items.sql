@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('19_shop_items.sql');
+
 -- ============================================================================
 -- Шаг 19: витрина магазина для бота и кабинета.
 --
@@ -65,3 +68,6 @@ comment on function shop_items(text) is
 -- и authenticated прямого доступа к каталогу артефактов нет.
 revoke all on function shop_items(text) from public;
 grant execute on function shop_items(text) to anon, authenticated, service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('19_shop_items.sql');

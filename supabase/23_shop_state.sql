@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('23_shop_state.sql');
+
 -- ============================================================================
 -- Шаг 23: окно магазина артефактов, общее для бота и кабинета.
 --
@@ -133,3 +136,6 @@ grant execute on function buy_artifact_impl(text, bigint, bigint, text, text) to
 
 revoke all on function buy_artifact(text, bigint, bigint, text, text) from public, anon;
 grant execute on function buy_artifact(text, bigint, bigint, text, text) to authenticated, service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('23_shop_state.sql');

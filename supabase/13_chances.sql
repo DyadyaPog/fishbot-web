@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('13_chances.sql');
+
 -- ============================================================================
 -- Шаг 13: снимок шансов улова, который считает бот.
 --
@@ -41,3 +44,6 @@ create policy "player_chances: свой" on player_chances
 revoke all on player_chances from anon, authenticated;
 grant select on player_chances to authenticated;
 grant select, insert, update, delete on player_chances to service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('13_chances.sql');

@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('21_repair.sql');
+
 -- ============================================================================
 -- Шаг 21: ремонт снаряжения целиком в Postgres.
 --
@@ -224,3 +227,6 @@ revoke all on function repair_item(bigint, text) from public, anon, authenticate
 
 grant execute on function repair_cost_of(numeric, numeric, numeric) to service_role;
 grant execute on function repair_item(bigint, text) to service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('21_repair.sql');

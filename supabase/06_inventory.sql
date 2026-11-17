@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('06_inventory.sql');
+
 -- ============================================================================
 -- Шаг 6: инвентарь.
 --
@@ -74,3 +77,6 @@ create unique index if not exists uq_inventory_equipped
 -- Ключ повторного переноса из SQLite.
 create unique index if not exists uq_inventory_legacy
     on inventory (channel_id, legacy_id);
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('06_inventory.sql');

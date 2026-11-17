@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('15_artifact_cleanse.sql');
+
 -- ============================================================================
 -- Шаг 15: очистка артефактов целиком в Postgres.
 --
@@ -430,3 +433,6 @@ on conflict (item_id) do update set
     curse_chance  = excluded.curse_chance,
     updated_at    = now();
 
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('15_artifact_cleanse.sql');

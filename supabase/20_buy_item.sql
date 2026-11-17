@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('20_buy_item.sql');
+
 -- ============================================================================
 -- Шаг 20: покупка снаряжения и админская выдача предметов в Postgres.
 --
@@ -550,3 +553,6 @@ comment on function admin_grant_item(text, bigint, bigint, integer, text, text) 
 revoke all on function admin_grant_item(text, bigint, bigint, integer, text, text) from public;
 grant execute on function admin_grant_item(text, bigint, bigint, integer, text, text)
     to service_role;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('20_buy_item.sql');

@@ -1,3 +1,6 @@
+-- Проверка порядка: файл применяется один раз и только после предыдущих шагов.
+select assert_migration('02_items_seed.sql', true);
+
 -- ============================================================================
 -- Шаг 2: справочник предметов (таблица items).
 --
@@ -193,3 +196,6 @@ on conflict (id) do update set
     description = excluded.description,
     level_required = excluded.level_required,
     max_uses    = excluded.max_uses;
+
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
+select register_migration('02_items_seed.sql');
