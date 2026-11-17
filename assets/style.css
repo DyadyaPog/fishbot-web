@@ -303,6 +303,7 @@ body {
     flex-direction: column;
     gap: 1rem;
     height: 100%;
+    min-width: 0;
 }
 
 /* Фреймы слева делят высоту колонки поровну, а «Последние уловы» тянутся
@@ -313,6 +314,7 @@ body {
 
 .profile-layout > .dashboard-panel {
     height: 100%;
+    min-width: 0;
 }
 
 .profile-frame-value {
@@ -1140,6 +1142,7 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
 
 @media (max-width: 900px) {
     .admin-grid { grid-template-columns: 1fr; }
+    .profile-layout { grid-template-columns: 1fr; }
     .profile-stats-grid { grid-template-columns: 1fr; }
     .admin-card-wide { grid-column: span 1; }
     .admin-command-input { min-width: 0; width: 100%; }
@@ -1666,6 +1669,12 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
 
 .profile-card {
     overflow: visible;
+    min-width: 0;
+}
+
+.profile-card-body,
+.profile-stat {
+    min-width: 0;
 }
 
 .profile-card-body {
@@ -1711,6 +1720,10 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 0.75rem;
+}
+
+@media (max-width: 900px) {
+    .profile-stats-grid { grid-template-columns: 1fr; }
 }
 
 .profile-stat {
