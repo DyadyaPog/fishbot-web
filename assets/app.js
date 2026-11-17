@@ -1,11 +1,39 @@
-/* Кабинет игрока — заготовка интерфейса.
- * Канал не задаётся в конфиге: после входа игрок выбирает канал, на котором рыбачил.
- * Данные пока демонстрационные. Точки подключения Supabase помечены TODO.
+/* Кабинет игрока — статическая страница поверх Supabase.
+ * Вход через Twitch (Supabase Auth), данные — строки игрока из Postgres.
+ * Канал не задаётся в конфиге: после входа список приходит из view my_channels.
+ * Без Supabase-конфига и сети остаётся демо-режим.
  */
 (function () {
     const CONFIG = window.FISHBOT_CONFIG || {};
-    const SUPABASE_READY = Boolean(CONFIG.supabaseUrl && CONFIG.supabaseAnonKey);
+    const SUPABASE_URL = String(CONFIG.supabaseUrl || '').replace(/\/+$/, '');
+    const SUPABASE_ANON_KEY = String(CONFIG.supabaseAnonKey || '');
+    const HAS_SDK = Boolean(window.supabase && typeof window.supabase.createClient === 'function');
+    const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && HAS_SDK);
+    const client = SUPABASE_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
     const STORAGE_KEY = 'fishbot.channel';
+    const MAX_CATCHES = 10;
+    const MAX_RANKING = 25;
+
+    /* Типы предметов в базе строчные (enum item_kind), в интерфейсе — заглавные. */
+    const ITEM_KIND_TO_TYPE = {
+        rod: 'ROD', line: 'LINE', hook: 'HOOK', bait: 'BAIT',
+        fish: 'FISH', trash: 'FISH', treasure: 'FISH',
+        artifact: 'ARTIFACT', consumable: 'CONSUMABLE'
+    };
+
+    const uiType = (raw) => ITEM_KIND_TO_TYPE[String(raw || '').toLowerCase()]
+        || String(raw || '').toUpperCase();
+
+    function redirectUrl() {
+        if (location.protocol === 'http:' || location.protocol === 'https:') {
+            return `${location.origin}${location.pathname}`;
+        }
+        return location.href.split('#')[0];
+    }
+
+    function shortError(error) {
+        return String((error && error.message) || error || 'неизвестная ошибка').slice(0, 160);
+    }
 
     const RARITY = {
         common: { icon: '🐟', color: 'var(--rarity-common)' },
@@ -40,8 +68,9 @@
                 username: 'DemoFisher',
                 balance: 1250,
                 level: 7,
-                xp: 2450,
-                xpForNext: 3600,
+                xp: 150,
+                xpForCurrent: 132,
+                xpForNext: 167,
                 fishCaught: 312
             },
             inventory: [
@@ -79,6 +108,7 @@
                 balance: 340,
                 level: 4,
                 xp: 62,
+                xpForCurrent: 53,
                 xpForNext: 75,
                 fishCaught: 87
             },
@@ -108,6 +138,11 @@
         channels: [],
         channelId: null,
         demo: false,
+        /* Сессия Supabase есть, но профиль мог не загрузиться. */
+        session: false,
+        /* Профиль и каналы успешно прочитаны из базы. */
+        loaded: false,
+        userId: null,
         username: '',
         filters: { type: 'all', rarity: 'all', q: '' }
     };
@@ -154,6 +189,185 @@
 
     function savedChannel() {
         try { return localStorage.getItem(STORAGE_KEY); } catch (e) { return null; }
+    }
+
+    function formatMoney(value) {
+        return `${Number(value || 0).toLocaleString('ru-RU')} 💰`;
+    }
+
+    function relativeTime(value) {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return '';
+        const minutes = Math.floor((Date.now() - date.getTime()) / 60000);
+        if (minutes < 1) return 'только что';
+        if (minutes < 60) return `${minutes} мин назад`;
+        const hours = Math.floor(minutes / 60);
+        if (hours < 24) return `${hours} ч назад`;
+        return `${Math.floor(hours / 24)} дн назад`;
+    }
+
+    function formatDateTime(value) {
+        const date = value ? new Date(value) : null;
+        if (!date || Number.isNaN(date.getTime())) return '';
+        return date.toLocaleString('ru-RU', {
+            day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+    }
+
+    /* В meta лежит только то, что меняется у экземпляра (прочность, вес, эффекты). */
+    function inventoryMetaText(row, item) {
+        const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+        const parts = [];
+
+        if (meta.uses != null && meta.max_uses != null) parts.push(`Прочность ${meta.uses} / ${meta.max_uses}`);
+        else if (meta.max_uses != null) parts.push(`Прочность ${meta.max_uses}`);
+        if (meta.weight != null && Number.isFinite(Number(meta.weight))) {
+            parts.push(`Вес ${Number(meta.weight).toFixed(2)} кг`);
+        }
+        if (meta.cursed) parts.push('проклят');
+        if (Array.isArray(meta.effects) && meta.effects.length) parts.push(`эффектов: ${meta.effects.length}`);
+        if (row.expires_at) parts.push(`до ${formatDateTime(row.expires_at)}`);
+
+        if (!parts.length) {
+            const type = uiType(row.item_type);
+            if (ITEM_TYPES[type] && ITEM_TYPES[type].equippable) parts.push('Снаряжение');
+            else if (item.price != null) parts.push(`Цена продажи: ${formatMoney(item.price)}`);
+        }
+
+        return parts.join(' · ');
+    }
+
+    function mapInventoryRow(row) {
+        const item = row.items && typeof row.items === 'object' ? row.items : {};
+        return {
+            id: String(row.id),
+            item_id: row.item_id,
+            item_type: uiType(row.item_type),
+            name: item.name || row.item_id,
+            rarity: item.rarity || 'common',
+            price: Number(item.price) || 0,
+            quantity: Number(row.quantity) || 1,
+            is_equipped: Boolean(row.is_equipped),
+            meta: inventoryMetaText(row, item)
+        };
+    }
+
+    /* Профили игрока: view my_channels уже отфильтрован по auth.uid() и RLS. */
+    async function loadPlayer() {
+        if (!SUPABASE_READY) return;
+
+        setStatus('Загрузка…', true);
+
+        try {
+            const claim = await client.rpc('claim_profile');
+            if (claim.error) throw claim.error;
+            state.userId = claim.data == null ? null : String(claim.data);
+
+            const response = await client
+                .from('my_channels')
+                .select('channel_id,login,display_name,username,balance,xp,level,xp_for_current,xp_for_next,fish_caught')
+                .order('login');
+            if (response.error) throw response.error;
+
+            const rows = response.data || [];
+            state.session = true;
+            state.loaded = true;
+            state.demo = false;
+            state.username = rows.length ? (rows[0].username || '') : '';
+            state.channels = rows.map((row) => ({
+                id: String(row.channel_id),
+                login: row.login,
+                displayName: row.display_name || row.login,
+                player: {
+                    userId: state.userId,
+                    username: row.username || '',
+                    balance: Number(row.balance) || 0,
+                    level: Number(row.level) || 1,
+                    xp: Number(row.xp) || 0,
+                    xpForCurrent: Number(row.xp_for_current) || 0,
+                    xpForNext: Number(row.xp_for_next) || 0,
+                    fishCaught: Number(row.fish_caught) || 0
+                },
+                inventory: [],
+                catches: [],
+                ranking: []
+            }));
+
+            const saved = savedChannel();
+            state.channelId = state.channels.some((channel) => channel.id === saved)
+                ? saved
+                : (state.channels[0] ? state.channels[0].id : null);
+
+            if (state.channelId) await loadChannel(state.channelId);
+
+            setStatus(state.username ? `Twitch · ${state.username}` : 'Вход выполнен', true);
+            renderAll();
+            if (state.channels.length) showTab(state.tab || 'profile');
+            else renderAuthOnly();
+        } catch (error) {
+            console.error(error);
+            state.loaded = false;
+            setStatus('Ошибка загрузки', false);
+            toast(`Не удалось загрузить данные: ${shortError(error)}`);
+            renderChip();
+            if (state.channels.length === 0) renderAuthOnly();
+        }
+    }
+
+    /* Детали одного канала: инвентарь, последние уловы, рейтинг. */
+    async function loadChannel(channelId) {
+        const channel = state.channels.find((entry) => entry.id === String(channelId));
+        if (!channel || !SUPABASE_READY || !state.userId) return;
+
+        const [inventory, catches, ranking] = await Promise.all([
+            client.from('inventory')
+                .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at,items(name,rarity,price,kind)')
+                .eq('channel_id', channelId)
+                .eq('user_id', state.userId)
+                .order('item_type')
+                .order('id'),
+            client.from('catches')
+                .select('item_id,price,caught_at,items(name,rarity)')
+                .eq('channel_id', channelId)
+                .eq('user_id', state.userId)
+                .order('caught_at', { ascending: false })
+                .limit(MAX_CATCHES),
+            client.from('channel_ranking')
+                .select('username,balance,level,place')
+                .eq('channel_id', channelId)
+                .order('place', { ascending: true })
+                .limit(MAX_RANKING)
+        ]);
+
+        const error = inventory.error || catches.error || ranking.error;
+        if (error) {
+            console.error(error);
+            /* Сбрасываем данные канала: иначе интерфейс покажет чужой канал как текущий. */
+            channel.inventory = [];
+            channel.catches = [];
+            channel.ranking = [];
+            channel.loadError = shortError(error);
+            toast(`Не удалось загрузить канал: ${shortError(error)}`);
+            return;
+        }
+
+        channel.loadError = null;
+        channel.inventory = (inventory.data || []).map(mapInventoryRow);
+        channel.catches = (catches.data || []).map((row) => {
+            const item = row.items && typeof row.items === 'object' ? row.items : {};
+            return {
+                name: item.name || row.item_id,
+                rarity: item.rarity || 'common',
+                price: Number(row.price) || 0,
+                at: relativeTime(row.caught_at)
+            };
+        });
+        channel.ranking = (ranking.data || []).map((row, index) => ({
+            username: row.username || '—',
+            place: Number(row.place) || index + 1,
+            value: formatMoney(row.balance),
+            level: Number(row.level) || 1
+        }));
     }
 
     function showTab(name) {
@@ -204,15 +418,16 @@
         }).join('');
     }
 
-    function selectChannel(id) {
+    async function selectChannel(id) {
         if (!state.channels.some((channel) => channel.id === id)) return;
 
         state.channelId = id;
         rememberChannel(id);
+        if (!state.demo) await loadChannel(id);
         renderAll();
 
         const channel = currentChannel();
-        if (channel) toast(`Канал: ${channel.displayName}`);
+        if (channel && !channel.loadError) toast(`Канал: ${channel.displayName}`);
     }
 
     function renderChip() {
@@ -232,8 +447,14 @@
         }
 
         const login = el('btn-login');
-        login.textContent = state.channels.length > 0 ? 'Выйти' : 'Войти через Twitch';
-        el('btn-demo').textContent = state.channels.length > 0 ? 'Сбросить' : 'Демо-режим';
+        if (state.demo || !state.session) {
+            login.textContent = 'Войти через Twitch';
+        } else {
+            login.textContent = state.loaded ? 'Выйти' : 'Повторить';
+        }
+        el('btn-demo').textContent = state.demo
+            ? 'Сбросить'
+            : (state.session ? 'Обновить' : 'Демо-режим');
     }
 
     function renderProfile() {
@@ -247,13 +468,18 @@
         el('stat-level').textContent = player.level;
         el('stat-fish').textContent = Number(player.fishCaught || 0).toLocaleString('ru-RU');
 
-        const next = Number(player.xpForNext) || 1;
-        const percent = Math.max(0, Math.min(100, (Number(player.xp) / next) * 100));
+        const start = Number(player.xpForCurrent) || 0;
+        const next = Number(player.xpForNext) || 0;
+        const span = Math.max(1, next - start);
+        const percent = Math.max(0, Math.min(100, ((Number(player.xp) - start) / span) * 100));
         el('xp-fill').style.width = `${percent.toFixed(1)}%`;
         el('xp-current').textContent = `${Number(player.xp).toLocaleString('ru-RU')} XP`;
         el('xp-next').textContent = `до ${Number(next).toLocaleString('ru-RU')} XP`;
 
-        el('recent-catches').innerHTML = catches.map((catchItem) => {
+        if (channel.loadError) {
+            el('recent-catches').innerHTML = '<div class="empty-state">Не удалось загрузить уловы</div>';
+        } else {
+            el('recent-catches').innerHTML = catches.map((catchItem) => {
             const rarity = RARITY[catchItem.rarity] || RARITY.empty;
             return `
                 <div class="admin-event-row">
@@ -264,7 +490,8 @@
                     <div class="item-details" style="color:${rarity.color}">${Number(catchItem.price) || 0} 💰</div>
                 </div>
             `;
-        }).join('');
+            }).join('');
+        }
     }
 
     function renderLoadout() {
@@ -315,14 +542,18 @@
         el('inventory-counter').textContent = `${items.length} из ${total}`;
 
         if (items.length === 0) {
-            grid.innerHTML = `<div class="empty-state">${total === 0 ? 'На этом канале инвентарь пуст' : 'По фильтрам ничего не найдено'}</div>`;
+            const channel = currentChannel();
+            const message = channel && channel.loadError
+                ? 'Не удалось загрузить инвентарь канала'
+                : (total === 0 ? 'На этом канале инвентарь пуст' : 'По фильтрам ничего не найдено');
+            grid.innerHTML = `<div class="empty-state">${message}</div>`;
             return;
         }
 
         grid.innerHTML = items.map((item) => {
             const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
             const rarity = RARITY[item.rarity] || RARITY.empty;
-            const id = `${item.item_id}|${item.item_type}`;
+            const id = String(item.id);
 
             const action = meta.equippable
                 ? (item.is_equipped
@@ -363,9 +594,14 @@
         const channelLabel = el('ranking-channel');
         if (channelLabel) channelLabel.textContent = channel ? `· ${channel.displayName}` : '';
 
+        if (channel && channel.loadError) {
+            el('ranking-list').innerHTML = '<div class="empty-state">Рейтинг недоступен: канал не загрузился</div>';
+            return;
+        }
+
         el('ranking-list').innerHTML = rows.map((row, index) => `
             <div class="ranking-item">
-                <span class="rank">#${index + 1}</span>
+                <span class="rank">#${row.place || index + 1}</span>
                 <span class="name">${esc(row.username)}</span>
                 <span class="value">${esc(row.value)}</span>
             </div>
@@ -386,19 +622,28 @@
         renderInventory();
     }
 
-    /* TODO(Supabase): вместо локального флага — RPC equip_item / unequip_item
-       с channel_id и проверкой, что строка принадлежит текущему игроку. */
-    function changeEquipment(action, rawId) {
+    /* В демо — локальный флаг, на живой базе — RPC с проверкой владельца строки. */
+    async function changeEquipment(action, rawId) {
         const channel = currentChannel();
         if (!channel) return;
 
-        const [itemId, itemType] = String(rawId).split('|');
-        const item = channel.inventory.find((entry) => entry.item_id === itemId && entry.item_type === itemType);
+        const item = channel.inventory.find((entry) => String(entry.id) === String(rawId));
         if (!item) return;
+
+        if (!state.demo) {
+            if (!client) return;
+            const method = action === 'equip' ? 'equip_item' : 'unequip_item';
+            const { error } = await client.rpc(method, { p_inventory_id: Number(item.id) });
+            if (error) {
+                console.error(error);
+                toast(`Не удалось изменить экипировку: ${shortError(error)}`);
+                return;
+            }
+        }
 
         if (action === 'equip') {
             channel.inventory.forEach((entry) => {
-                if (entry.item_type === itemType) entry.is_equipped = false;
+                if (entry.item_type === item.item_type) entry.is_equipped = false;
             });
             item.is_equipped = true;
             toast(`Экипировано: ${item.name}`);
@@ -411,23 +656,20 @@
         renderLoadout();
     }
 
-    function toggleDemo() {
-        if (state.channels.length > 0) {
-            state.channels = [];
-            state.channelId = null;
-            state.demo = false;
-            state.username = '';
-            setStatus('Гостевой режим', false);
-            renderAuthOnly();
-            renderChannels();
-            renderChip();
-            return;
-        }
-
+    function startDemo() {
         state.demo = true;
-        state.channels = clone(DEMO_CHANNELS);
-        state.channelId = state.channels.some((channel) => channel.id === savedChannel())
-            ? savedChannel()
+        state.userId = null;
+        state.channels = clone(DEMO_CHANNELS).map((channel) => ({
+            ...channel,
+            inventory: channel.inventory.map((item, index) => ({
+                ...item,
+                id: `${channel.id}-${index}`
+            }))
+        }));
+
+        const saved = savedChannel();
+        state.channelId = state.channels.some((channel) => channel.id === saved)
+            ? saved
             : state.channels[0].id;
         state.username = state.channels[0].player.username;
 
@@ -437,9 +679,66 @@
         toast('Демо-режим: два канала, данные ненастоящие');
     }
 
+    function toggleDemo() {
+        if (state.demo) {
+            state.demo = false;
+            state.channels = [];
+            state.channelId = null;
+            state.username = '';
+            if (state.session) { loadPlayer(); return; }
+            setStatus('Гостевой режим', false);
+            renderAuthOnly();
+            renderChannels();
+            renderChip();
+            return;
+        }
+
+        if (state.session) { loadPlayer(); return; }
+        startDemo();
+    }
+
+    async function logout() {
+        try {
+            if (client) await client.auth.signOut();
+        } catch (error) {
+            console.error(error);
+        }
+
+        state.session = false;
+        state.loaded = false;
+        state.demo = false;
+        state.userId = null;
+        state.channels = [];
+        state.channelId = null;
+        state.username = '';
+
+        setStatus('Гостевой режим', false);
+        renderAuthOnly();
+        renderChannels();
+        renderChip();
+        renderProfile();
+        renderInventory();
+        renderLoadout();
+        renderRankings();
+        toast('Вы вышли из аккаунта');
+    }
+
     function handleLogin() {
-        if (state.channels.length > 0) {
-            toggleDemo();
+        if (state.demo) {
+            state.demo = false;
+            state.channels = [];
+            state.channelId = null;
+            state.username = '';
+            setStatus('Гостевой режим', false);
+            renderAuthOnly();
+            renderChannels();
+            renderChip();
+        }
+
+        /* Сессия уже есть: повторяем загрузку профиля, а не новый OAuth. */
+        if (state.session) {
+            if (state.loaded) logout();
+            else loadPlayer();
             return;
         }
 
@@ -449,11 +748,31 @@
             return;
         }
 
-        /* TODO(Supabase): после входа получить каналы, где у игрока есть данные:
-           RPC my_channels() -> [{ channel_id, login, display_name }].
-           Канал в config.js не нужен: список придёт из базы, а каждый запрос
-           (профиль, инвентарь, уловы, экипировка, рейтинг) фильтруется по выбранному id. */
-        toast('OAuth-вход ещё не подключён: нужен клиент supabase-js и провайдер Twitch');
+        client.auth.signInWithOAuth({
+            provider: 'twitch',
+            options: { redirectTo: redirectUrl(), scopes: 'user:read:email' }
+        }).then(({ error }) => {
+            if (!error) return;
+            console.error(error);
+            toast(`Вход через Twitch не удался: ${shortError(error)}`);
+        });
+    }
+
+    /* Сессию после redirect разбирает supabase-js; здесь только догружаем данные. */
+    async function startSession() {
+        if (!SUPABASE_READY) return;
+
+        try {
+            const { data, error } = await client.auth.getSession();
+            if (error) throw error;
+            if (!data.session) return;
+            state.session = true;
+            await loadPlayer();
+        } catch (error) {
+            console.error(error);
+            setStatus('Гостевой режим', false);
+            toast(`Не удалось восстановить сессию: ${shortError(error)}`);
+        }
     }
 
     function bind() {
@@ -479,5 +798,6 @@
         renderRankings();
         setStatus('Гостевой режим', false);
         renderAuthOnly();
+        startSession();
     });
 })();

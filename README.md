@@ -54,13 +54,19 @@ window.FISHBOT_CONFIG = {
 
 ## Данные в Supabase
 
-- Таблицы `users`, `inventory`, `catches`; представление для рейтинга. Строки привязаны
-  к каналу, поэтому один игрок может иметь разные балансы, уровни и инвентари на
-  разных каналах.
-- Провайдер Twitch в **Authentication → Providers**, адрес страницы — в
-  **Authentication → URL Configuration** (redirect URL).
-- RLS: игрок читает и меняет только свои строки; экипировка — через RPC с проверкой
-  владельца.
+- Таблицы `channels`, `accounts`, `players`, `inventory`, `catches`, `events` и справочник
+  `items`; views `my_channels` (каналы игрока) и `channel_ranking` (топ канала). Строки
+  привязаны к каналу, поэтому один игрок может иметь разные балансы, уровни и инвентари
+  на разных каналах.
+- Схема и наполнение — SQL-скрипты в `supabase/`; данные из SQLite переносит
+  `fishBot/scripts/migrate-to-supabase.mjs` (`npm run db:migrate`).
+- Провайдер Twitch в **Authentication → Providers**; адрес страницы — в
+  **Authentication → URL Configuration** (redirect URL). Для локального запуска это
+  `http://localhost:4173/`, для Pages — `https://<user>.github.io/<repo>/`.
+- При первом входе `claim_profile()` связывает Twitch ID с `auth.users.id`; дальше
+  страница читает `my_channels`, `inventory`, `catches`, `channel_ranking` под RLS.
+- RLS: игрок читает только свои строки; экипировка — через RPC `equip_item` /
+  `unequip_item` с проверкой владельца.
 
 ## Публикация
 

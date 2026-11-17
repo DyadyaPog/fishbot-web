@@ -58,9 +58,9 @@
         </header>
 
         <div class="notice notice-warn" id="setup-notice" hidden>
-            Заготовка страницы. Supabase ещё не подключён: укажите <code>supabaseUrl</code> и
-            <code>supabaseAnonKey</code> в <code>config.js</code>, включите провайдер Twitch в Supabase
-            и добавьте адрес этой страницы в разрешённые redirect URL. До этого доступен только демо-режим.
+            Supabase не настроен: укажите <code>supabaseUrl</code> и <code>supabaseAnonKey</code> в
+            <code>config.js</code>, включите провайдер Twitch в Supabase → Authentication → Providers
+            и добавьте адрес этой страницы в разрешённые redirect URL. До этого работает только демо-режим.
         </div>
 
         <!-- ГОСТЬ -->
@@ -119,9 +119,6 @@
                         <span id="xp-current">0 XP</span>
                         <span id="xp-next">до следующего уровня</span>
                     </div>
-                    <p class="admin-hint" style="margin-top: 1rem;">
-                        Полоса опыта — заготовка: точный порог уровня считается формулой бота.
-                    </p>
                 </div>
 
                 <div class="dashboard-panel animate-up" style="grid-column: span 2;">
@@ -187,15 +184,13 @@
                     <div class="panel-title"><span class="panel-icon">🏆</span> Рейтинг канала <span class="panel-channel" id="ranking-channel"></span></div>
                 </div>
                 <div class="ranking-list" id="ranking-list"></div>
-                <p class="admin-hint" style="margin-top: 1rem;">
-                    Заготовка: список придёт из Supabase-представления с топом по балансу и уровню.
-                </p>
             </div>
         </section>
     </main>
 
     <div class="toast" id="toast"></div>
 
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" crossorigin="anonymous"></script>
     <script src="config.js"></script>
     <script src="assets/app.js"></script>
 </body>
