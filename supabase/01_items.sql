@@ -32,3 +32,7 @@ create index if not exists idx_items_kind on items (kind);
 -- Описание предмета для кабинета. Бот заполняет его при синхронизации каталога;
 -- пустые значения допустимы: пользователь добавляет описания позже.
 alter table if exists items add column if not exists description text;
+
+-- Минимальный уровень покупки для магазина. У рыб, мусора и расходников
+-- остаётся 1; снаряжение и артефакты получают своё значение при синхронизации.
+alter table if exists items add column if not exists level_required integer not null default 1;
