@@ -708,7 +708,7 @@
                 <div class="dashboard-panel">
                     ${header('считает бот')}
                     <div class="chances-body">
-                        <div class="empty-state">Шансы появятся после первого заброса в чате</div>
+                        <div class="empty-state">Шансы появятся после команды !шансы или первого заброса в чате</div>
                     </div>
                 </div>
             `;
