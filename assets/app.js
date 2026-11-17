@@ -244,13 +244,13 @@
             } else {
                 sellPrice = Math.round(item.price * 0.5);
             }
-            parts.push(`Цена продажи: ${formatMoney(sellPrice)}`);
+            parts.push(`Цена: ${formatMoney(sellPrice)}`);
         }
 
         if (!parts.length) {
             const type = uiType(row.item_type);
             if (ITEM_TYPES[type] && ITEM_TYPES[type].equippable) parts.push('Снаряжение');
-            else if (item.price != null) parts.push(`Цена продажи: ${formatMoney(item.price)}`);
+            else if (item.price != null) parts.push(`Цена: ${formatMoney(item.price)}`);
         }
 
         return parts.join(' · ');
@@ -616,8 +616,8 @@
             ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
             : sellButton;
 
-        return `
-            <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="border-left-color:${rarity.color}">
+                    return `
+                <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="--rarity-color:${rarity.color}; border-left-color:${rarity.color}">
                 <div class="inv-head">
                                             <div class="inv-icon">${meta.icon}</div>
                     <div class="inv-title">
@@ -626,7 +626,6 @@
                     </div>
                     ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
                 </div>
-                ${item.is_equipped ? '<div class="inv-equipped-badge">надето</div>' : ''}
                 ${(item.item_type === 'FISH' || (ITEM_TYPES[item.item_type] && ITEM_TYPES[item.item_type].equippable)) && item.meta
                     ? item.meta.split(' · ').filter(Boolean).map((part) => `<div class="inv-info-block">${esc(part)}</div>`).join('')
                     : `<div class="inv-meta">${esc(item.meta || '')}</div>`}
@@ -648,7 +647,11 @@
         const channel = currentChannel();
         const limit = inventoryLimitForLevel(channel && channel.player ? channel.player.level : 1);
 
-        el('inventory-counter').textContent = `занято ${occupied} из ${limit}`;
+        const counter = el('inventory-counter');
+        if (counter) {
+            counter.textContent = `занято ${occupied} из ${limit}`;
+            counter.classList.toggle('full', occupied >= limit);
+        }
 
         if (items.length === 0) {
             const message = channel && channel.loadError
