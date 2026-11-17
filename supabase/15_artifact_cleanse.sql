@@ -6,10 +6,10 @@
 -- у гадалки с риском усилить проклятие. Ролл значений и списание монет
 -- выполняются здесь, а не в браузере и не в JS-движке бота.
 --
--- Бот в режиме DB_BACKEND=supabase вызывает cleanse_artifact() через RPC;
--- SQLite-режим продолжает использовать src/engine/artifactCleanse.js.
+-- Бот в режиме DB_BACKEND=supabase вызывает cleanse_artifact() через RPC.
+-- Локальный SQLite очистку не поддерживает.
 --
--- Запускать в Supabase → SQL Editor после 01–15. Скрипт идемпотентен.
+-- Запускать в Supabase → SQL Editor после 01–14. Скрипт идемпотентен.
 -- ============================================================================
 
 create table if not exists artifact_catalog (
@@ -33,7 +33,7 @@ alter table artifact_catalog add column if not exists curse_chance numeric not n
 alter table artifact_catalog add column if not exists updated_at timestamptz not null default now();
 
 comment on table artifact_catalog is
-    'Эффекты и шанс проклятия артефактов: источник для RPC очистки. Синхронизирует бот из artifacts.json.';
+    'Эффекты, цена и шанс проклятия артефактов: источник для RPC покупки и очистки. Синхронизирует бот из artifacts.json.';
 
 -- Каталог нужен только security definer-функциям, прямого чтения из веба нет.
 alter table artifact_catalog enable row level security;
@@ -295,7 +295,7 @@ begin
         v_effects := artifact_roll_effects(v_catalog.effects);
         v_cursed := false;
     else
-        -- Коэффициенты синхронизированы с src/config/game-balance.js.
+        -- Коэффициенты очистки заданы здесь и являются источником истины.
         v_cost := greatest(1, ceil(v_price * 0.25)::integer);
 
         if v_balance < v_cost then
