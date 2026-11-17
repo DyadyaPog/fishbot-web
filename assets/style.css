@@ -1668,6 +1668,37 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     display: flex;
     flex-direction: column;
     gap: 1.25rem;
+    flex: 1 1 auto;
+}
+
+.profile-fishing-placeholder {
+    flex: 1 1 auto;
+    min-height: 110px;
+    border: 1px dashed var(--glass-border-hover);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.02);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.4rem;
+    text-align: center;
+    padding: 1rem;
+}
+
+.profile-fishing-icon {
+    font-size: 2.2rem;
+    opacity: 0.85;
+}
+
+.profile-fishing-title {
+    font-weight: 700;
+    color: var(--text-accent);
+}
+
+.profile-fishing-text {
+    font-size: 0.78rem;
+    color: var(--text-dim);
 }
 
 .profile-stats-grid {
