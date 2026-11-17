@@ -36,3 +36,7 @@ alter table if exists items add column if not exists description text;
 -- Минимальный уровень покупки для магазина. У рыб, мусора и расходников
 -- остаётся 1; снаряжение и артефакты получают своё значение при синхронизации.
 alter table if exists items add column if not exists level_required integer not null default 1;
+
+-- Заряды нового экземпляра снаряжения: -1 — без ограничения, null — не расходуется.
+-- Нужны RPC покупки и админской выдачи, чтобы прочность считала база.
+alter table if exists items add column if not exists max_uses integer;
