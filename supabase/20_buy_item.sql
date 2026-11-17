@@ -118,6 +118,20 @@ begin
         );
     end if;
 
+    -- Заряды берутся из items: если их нет, каталог ещё не синхронизирован
+    -- ботом и предмет мог стать «вечным» (max_uses = null). Покупка запрещена.
+    if v_item.max_uses is null then
+        return jsonb_build_object(
+            'ok', false,
+            'code', 'missing_max_uses',
+            'error', format(
+                'У снаряжения «%s» не заданы заряды: каталог items не синхронизирован ботом (max_uses is null).',
+                v_item.name
+            ),
+            'itemId', v_item.id
+        );
+    end if;
+
     select * into v_player
     from players
     where channel_id = p_channel_id
@@ -389,6 +403,21 @@ begin
             'ok', false,
             'code', 'not_found',
             'error', 'Предмет не найден в каталоге.'
+        );
+    end if;
+
+    -- Снаряжение без зарядов в items — каталог не синхронизирован ботом,
+    -- выдача запрещена, чтобы не создать «вечный» предмет.
+    if v_item.kind in ('rod', 'line', 'hook', 'bait')
+       and v_item.max_uses is null then
+        return jsonb_build_object(
+            'ok', false,
+            'code', 'missing_max_uses',
+            'error', format(
+                'У снаряжения «%s» не заданы заряды: каталог items не синхронизирован ботом (max_uses is null).',
+                v_item.name
+            ),
+            'itemId', v_item.id
         );
     end if;
 
