@@ -1230,11 +1230,35 @@
         startDemo();
     }
 
+    /* Supabase хранит сессию под ключом sb-<project-ref>-auth-token.
+       Если signOut не смог удалить её (офлайн/истёкший токен), чистим
+       ключи вручную — иначе после перезагрузки пользователь снова войдёт. */
+    function clearSupabaseSessionStorage() {
+        let ref = '';
+        try { ref = new URL(SUPABASE_URL).hostname.split('.')[0]; } catch (e) { return; }
+        if (!ref) return;
+
+        const keys = [`sb-${ref}-auth-token`, `sb-${ref}-auth-token-code-verifier`];
+        for (const key of keys) {
+            try { localStorage.removeItem(key); } catch (e) { /* приватный режим */ }
+            try { sessionStorage.removeItem(key); } catch (e) { /* приватный режим */ }
+        }
+    }
+
     async function logout() {
         try {
-            if (client) await client.auth.signOut();
+            if (client) {
+                /* Не ждём бесконечно: в офлайне signOut может зависнуть
+                   на ретраях. Локальные ключи всё равно очистим ниже. */
+                await Promise.race([
+                    client.auth.signOut(),
+                    new Promise((resolve) => setTimeout(resolve, 5000))
+                ]);
+            }
         } catch (error) {
             console.error(error);
+        } finally {
+            clearSupabaseSessionStorage();
         }
 
         state.session = false;
