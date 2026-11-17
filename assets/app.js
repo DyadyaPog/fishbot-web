@@ -9,7 +9,13 @@
     const SUPABASE_ANON_KEY = String(CONFIG.supabaseAnonKey || '');
     const HAS_SDK = Boolean(window.supabase && typeof window.supabase.createClient === 'function');
     const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && HAS_SDK);
-    const client = SUPABASE_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+    /* PKCE: токены не приходят в URL-фрагменте, обмен идёт по коду.
+       Redirect URL в Supabase остаётся тем же, что и для implicit. */
+    const client = SUPABASE_READY
+        ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { flowType: 'pkce', detectSessionInUrl: true }
+        })
+        : null;
     const STORAGE_KEY = 'fishbot.channel';
     const ITEMS_CACHE_KEY = 'fishbot.items.catalog';
     const ITEMS_CACHE_AT_KEY = 'fishbot.items.catalog.at';
