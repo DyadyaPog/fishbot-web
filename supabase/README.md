@@ -36,6 +36,7 @@
 | 23 | `23_shop_state.sql` | окно магазина артефактов, гейт в `buy_artifact` |
 | 24 | `24_hardening.sql` | лимиты, журнал админки, RLS `shop_state`, рейтинг без Twitch ID, блокировки экипировки |
 | 25 | `25_items_public.sql` | вьюха `items_public`, таблица `items` закрыта |
+| 26 | `26_shop_items_effects.sql` | витрина `shop_items` отдаёт возможные статы артефактов |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -68,6 +69,7 @@
 23_shop_state.sql
 24_hardening.sql
 25_items_public.sql
+26_shop_items_effects.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен

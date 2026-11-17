@@ -2036,6 +2036,13 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
     color: var(--warning);
 }
 
+.shop-curse {
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #f87171;
+    opacity: 0.9;
+}
+
 .shop-item { height: 100%; }
 
 .shop-item .inv-actions { margin-top: auto; }

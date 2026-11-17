@@ -255,18 +255,18 @@
         { id: 'line_common', name: 'Обычная леска', rarity: 'common', price: 650, levelRequired: 1, kind: 'line', artifactType: null },
         { id: 'hook_common', name: 'Простой крючок', rarity: 'common', price: 450, levelRequired: 1, kind: 'hook', artifactType: null },
         { id: 'bait_worm', name: 'Червь', rarity: 'common', price: 60, levelRequired: 1, kind: 'bait', artifactType: null },
-        { id: 'art_sock', name: 'Носок с дыркой', rarity: 'common', price: 3000, levelRequired: 1, kind: 'artifact', artifactType: 'catch' },
+        { id: 'art_sock', name: 'Носок с дыркой', rarity: 'common', price: 3000, levelRequired: 1, kind: 'artifact', artifactType: 'catch', effects: [{ type: 'type_modifier', target: 'fish', min: 0.99, max: 1.06 }, { type: 'type_modifier', target: 'trash', min: 0.96, max: 1.03 }, { type: 'type_modifier', target: 'treasure', min: 0.99, max: 1.04 }, { type: 'gold_bonus', min: -1, max: 3 }], curseChance: 0.30 },
         { id: 'rod_uncommon', name: 'Карбоновая удочка', rarity: 'uncommon', price: 3600, levelRequired: 8, kind: 'rod', artifactType: null },
         { id: 'bait_dough', name: 'Тесто', rarity: 'uncommon', price: 160, levelRequired: 8, kind: 'bait', artifactType: null },
-        { id: 'art_spoon', name: 'Позолоченная ложка деда', rarity: 'uncommon', price: 12000, levelRequired: 8, kind: 'artifact', artifactType: 'gold' },
+        { id: 'art_spoon', name: 'Позолоченная ложка деда', rarity: 'uncommon', price: 12000, levelRequired: 8, kind: 'artifact', artifactType: 'gold', effects: [{ type: 'gold_bonus', min: -1, max: 4 }, { type: 'type_modifier', target: 'fish', min: 0.97, max: 1.01 }], curseChance: 0.24 },
         { id: 'rod_rare', name: 'Удочка мастера', rarity: 'rare', price: 8500, levelRequired: 20, kind: 'rod', artifactType: null },
         { id: 'bait_spoon', name: 'Блесна', rarity: 'rare', price: 450, levelRequired: 22, kind: 'bait', artifactType: null },
-        { id: 'art_glass_float', name: 'Стеклянный поплавок', rarity: 'rare', price: 35000, levelRequired: 20, kind: 'artifact', artifactType: 'comfort' },
+        { id: 'art_glass_float', name: 'Стеклянный поплавок', rarity: 'rare', price: 35000, levelRequired: 20, kind: 'artifact', artifactType: 'comfort', effects: [{ type: 'bait_save_chance', min: 0, max: 0.08 }, { type: 'cooldown_modifier', min: 0.96, max: 1.02 }], curseChance: 0.20 },
         { id: 'rod_epic', name: 'Удочка глубин', rarity: 'epic', price: 15500, levelRequired: 30, kind: 'rod', artifactType: null },
         { id: 'rod_legendary', name: 'Посох Океана', rarity: 'legendary', price: 25800, levelRequired: 40, kind: 'rod', artifactType: null },
-        { id: 'art_tide_crown', name: 'Корона Прилива', rarity: 'legendary', price: 180000, levelRequired: 40, kind: 'artifact', artifactType: 'treasure' },
+        { id: 'art_tide_crown', name: 'Корона Прилива', rarity: 'legendary', price: 180000, levelRequired: 40, kind: 'artifact', artifactType: 'treasure', effects: [{ type: 'type_modifier', target: 'treasure', min: 0.97, max: 1.1 }, { type: 'xp_multiplier', min: 0.98, max: 1.04 }, { type: 'type_modifier', target: 'empty', min: 0.99, max: 1.05 }], curseChance: 0.16 },
         { id: 'rod_mythic', name: 'Жезл Посейдона', rarity: 'mythic', price: 40000, levelRequired: 50, kind: 'rod', artifactType: null },
-        { id: 'art_poseidon_seal', name: 'Печать Посейдона', rarity: 'mythic', price: 400000, levelRequired: 50, kind: 'artifact', artifactType: 'catch' }
+        { id: 'art_poseidon_seal', name: 'Печать Посейдона', rarity: 'mythic', price: 400000, levelRequired: 50, kind: 'artifact', artifactType: 'catch', effects: [{ type: 'type_modifier', target: 'fish', min: 0.96, max: 1.08 }, { type: 'type_modifier', target: 'treasure', min: 0.96, max: 1.08 }, { type: 'rarity_modifier', target: 'mythic', min: 0.97, max: 1.1 }, { type: 'cooldown_modifier', min: 0.99, max: 1.06 }], curseChance: 0.08 }
     ];
 
     const el = (id) => document.getElementById(id);
@@ -1073,6 +1073,49 @@
         return effects.map(formatArtifactEffect).join(', ');
     }
 
+    /* Диапазоны возможных статов артефакта до покупки (как !help у бота,
+       но в процентном виде, чтобы совпадать с чипами купленных артефактов). */
+    function formatArtifactEffectRange(effect) {
+        const min = Number(effect && effect.min);
+        const max = Number(effect && effect.max);
+        const isRange = Number.isFinite(min) && Number.isFinite(max) && min !== max;
+        const percent = (v) => `${Math.round(Number(v) * 100)}%`;
+        const rangeOf = (fmt) => isRange ? `${fmt(min)}…${fmt(max)}` : fmt(min);
+        switch (effect && effect.type) {
+            case 'type_modifier': {
+                const emoji = { fish: ' Joel ', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
+                return `${emoji}×${rangeOf(percent)}`;
+            }
+            case 'rarity_modifier': {
+                const icon = RARITY_EFFECT_ICONS[effect.target] || '';
+                return `${icon}×${rangeOf(percent)}`;
+            }
+            case 'rarity_bonus': {
+                const icon = RARITY_EFFECT_ICONS[effect.target] || '';
+                const fmt = (v) => `${v >= 0 ? '+' : ''}${v}`;
+                return `${icon}${rangeOf(fmt)} к весу`;
+            }
+            case 'gold_bonus': {
+                const fmt = (v) => `${v >= 0 ? '+' : ''}${v}`;
+                return `${rangeOf(fmt)}💰/заброс`;
+            }
+            case 'xp_multiplier':
+                return `XP ×${rangeOf(percent)}`;
+            case 'cooldown_modifier':
+                return `кулдаун ×${rangeOf(percent)}`;
+            case 'bait_save_chance':
+                return `наживка цела: ${rangeOf(percent)}`;
+            case 'double_catch_chance':
+                return `двойной улов: ${rangeOf(percent)}`;
+            case 'inventory_bonus': {
+                const fmt = (v) => `${v >= 0 ? '+' : ''}${v}`;
+                return `${rangeOf(fmt)} слота`;
+            }
+            default:
+                return String(effect && effect.type || '');
+        }
+    }
+
     function renderItemCard(item) {
         const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
         const rarity = RARITY[item.rarity] || RARITY.empty;
@@ -1411,6 +1454,14 @@
             ? `${kind.label} · ${artifactType.emoji} ${artifactType.label}`
             : kind.label;
 
+        const isArtifact = item.kind === 'artifact';
+        const effectsBlock = isArtifact && Array.isArray(item.effects) && item.effects.length
+            ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffectRange(effect))}</span>`).join('')}</div>`
+            : '';
+        const curseBlock = isArtifact && item.curseChance > 0
+            ? `<div class="shop-curse">☠️ шанс проклятия: ${Math.round(item.curseChance * 100)}%</div>`
+            : '';
+
         return `
             <div class="inv-item shop-item" style="--rarity-color:${rarity.color}; border-left-color:${rarity.color}">
                 <div class="inv-head">
@@ -1422,6 +1473,8 @@
                 </div>
                 <div class="inv-info-block">${esc(`Цена: ${formatMoney(item.price)}`)}</div>
                 <div class="inv-info-block">${esc(`Минимальный уровень: ${item.levelRequired}`)}</div>
+                ${effectsBlock}
+                ${curseBlock}
                 ${reason ? `<div class="shop-lock">${esc(reason)}</div>` : ''}
                 <div class="inv-actions">
                     <button class="btn-admin primary" data-action="shop-buy" data-item="${esc(item.id)}" data-kind="${esc(item.kind)}"${reason ? ' disabled' : ''}>Купить</button>
@@ -1536,7 +1589,10 @@
             price: Number(row.price) || 0,
             levelRequired: Number(row.level_required) || 1,
             kind: row.kind,
-            artifactType: row.artifact_type || null
+            artifactType: row.artifact_type || null,
+            effects: Array.isArray(row.effects) ? row.effects : [],
+            curseEffects: Array.isArray(row.curse_effects) ? row.curse_effects : [],
+            curseChance: Number(row.curse_chance) || 0
         }));
 
         state.shopItemsByRarity.set(key, items);

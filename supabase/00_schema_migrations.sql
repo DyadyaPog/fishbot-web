@@ -61,12 +61,13 @@ insert into public.migration_order (idx, filename) values
     (24, '22_sell_quantity.sql'),
     (25, '23_shop_state.sql'),
     (26, '24_hardening.sql'),
-    (27, '25_items_public.sql')
+    (27, '25_items_public.sql'),
+    (28, '26_shop_items_effects.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Заглушки для следующих шагов: раскомментируйте и впишите имя файла, когда
 -- он появится. Файл, которого нет в списке, assert_migration не пропустит.
---   ,(28, '26_next_step.sql')
+--   ,(29, '27_next_step.sql')
 
 -- ---------------------------------------------------------------------------
 -- assert_migration(): «этот файл ещё не применяли и он не отстал от базы»
