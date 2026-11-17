@@ -38,6 +38,7 @@ comment on table artifact_catalog is
 -- Каталог нужен только security definer-функциям, прямого чтения из веба нет.
 alter table artifact_catalog enable row level security;
 revoke all on artifact_catalog from anon, authenticated;
+grant select, insert, update on artifact_catalog to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Ролл одного эффекта: диапазон min..max → конкретное значение.
