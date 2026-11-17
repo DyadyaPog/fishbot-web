@@ -1182,6 +1182,28 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     font-size: 0.95rem;
 }
 
+/* Кнопка обновления внутри плашки пользователя, чтобы не путалась
+   с кнопками в шапке. */
+.user-chip-refresh {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    margin-left: 0.15rem;
+    padding: 0;
+    border: 1px solid var(--glass-border);
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font-size: 0.85rem;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.user-chip-refresh:hover:not(:disabled) { background: rgba(255, 255, 255, 0.1); }
+.user-chip-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .notice {
     border: 1px solid rgba(56, 189, 248, 0.25);
     background: rgba(56, 189, 248, 0.08);
