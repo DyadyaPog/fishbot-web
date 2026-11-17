@@ -86,43 +86,44 @@
 
         <!-- ПРОФИЛЬ -->
         <section id="profile" class="tab-content">
-            <div class="stats-grid">
-                <div class="stat-card animate-up">
-                    <div class="stat-card-icon">💰</div>
-                    <div>
-                        <div class="stat-label">Баланс</div>
-                        <div class="stat-value" id="stat-balance">0</div>
+            <div class="dashboard-layout profile-layout">
+                <div class="profile-side">
+                    <div class="dashboard-panel animate-up">
+                        <div class="panel-header">
+                            <div class="panel-title"><span class="panel-icon">⭐</span> Уровень</div>
+                        </div>
+                        <div class="profile-frame-value" id="stat-level">1</div>
                     </div>
-                </div>
-                <div class="stat-card animate-up" style="animation-delay: 0.1s;">
-                    <div class="stat-card-icon">⭐</div>
-                    <div>
-                        <div class="stat-label">Уровень</div>
-                        <div class="stat-value" id="stat-level">1</div>
-                    </div>
-                </div>
-                <div class="stat-card animate-up" style="animation-delay: 0.2s;">
-                    <div class="stat-card-icon">🐟</div>
-                    <div>
-                        <div class="stat-label">Поймано</div>
-                        <div class="stat-value" id="stat-fish">0</div>
-                    </div>
-                </div>
-            </div>
 
-            <div class="dashboard-layout">
-                <div class="dashboard-panel animate-up" style="height: auto; align-self: start; max-width: 360px;">
-                    <div class="panel-header">
-                        <div class="panel-title"><span class="panel-icon">📈</span> Прогресс</div>
+                    <div class="dashboard-panel animate-up">
+                        <div class="panel-header">
+                            <div class="panel-title"><span class="panel-icon">📈</span> Прогресс</div>
+                        </div>
+                        <div class="profile-frame-body">
+                            <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width: 0%"></div></div>
+                            <div class="xp-caption">
+                                <span id="xp-current">0 XP</span>
+                                <span id="xp-next">до следующего уровня</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width: 0%"></div></div>
-                    <div class="xp-caption">
-                        <span id="xp-current">0 XP</span>
-                        <span id="xp-next">до следующего уровня</span>
+
+                    <div class="dashboard-panel animate-up">
+                        <div class="panel-header">
+                            <div class="panel-title"><span class="panel-icon">💰</span> Баланс</div>
+                        </div>
+                        <div class="profile-frame-value" id="stat-balance">0</div>
+                    </div>
+
+                    <div class="dashboard-panel animate-up">
+                        <div class="panel-header">
+                            <div class="panel-title"><span class="panel-icon">🐟</span> Поймано</div>
+                        </div>
+                        <div class="profile-frame-value" id="stat-fish">0</div>
                     </div>
                 </div>
 
-                <div class="dashboard-panel animate-up" style="grid-column: span 2;">
+                <div class="dashboard-panel animate-up">
                     <div class="panel-header">
                         <div class="panel-title"><span class="panel-icon">🎣</span> Последние уловы</div>
                     </div>

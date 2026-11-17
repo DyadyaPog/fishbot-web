@@ -626,7 +626,8 @@
                     </div>
                     ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
                 </div>
-                ${item.item_type === 'FISH' && item.meta
+                ${item.is_equipped ? '<div class="inv-equipped-badge">надето</div>' : ''}
+                ${(item.item_type === 'FISH' || (ITEM_TYPES[item.item_type] && ITEM_TYPES[item.item_type].equippable)) && item.meta
                     ? item.meta.split(' · ').filter(Boolean).map((part) => `<div class="inv-info-block">${esc(part)}</div>`).join('')
                     : `<div class="inv-meta">${esc(item.meta || '')}</div>`}
                 ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
@@ -635,7 +636,6 @@
                 <div class="inv-actions">
                     ${action}
                     ${secondary}
-                    ${item.is_equipped ? '<span class="inv-meta">надето</span>' : ''}
                 </div>
             </div>
         `;
