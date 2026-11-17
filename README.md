@@ -56,9 +56,10 @@ window.FISHBOT_CONFIG = {
 
 ## Данные в Supabase
 
-- Таблицы `channels`, `accounts`, `players`, `inventory`, `catches`, `events`, `shop_state` и
-  справочники `items` / `artifact_catalog`; views `my_channels` (каналы игрока) и
-  `channel_ranking` (топ канала). Строки
+- Таблицы `channels`, `accounts`, `players`, `inventory`, `catches`, `events`, `shop_state`;
+  справочник `items` закрыт для клиентов — кабинет читает вьюху `items_public`
+  с витринными колонками, `artifact_catalog` доступен только функциям; views
+  `my_channels` (каналы игрока) и `channel_ranking` (топ канала). Строки
   привязаны к каналу, поэтому один игрок может иметь разные балансы, уровни и инвентари
   на разных каналах.
 - Схема и наполнение — SQL-скрипты в `supabase/`; данные из SQLite переносит

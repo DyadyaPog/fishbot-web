@@ -318,7 +318,11 @@
             } catch (e) { /* повреждённый кэш — перезагрузим */ }
         }
         try {
-            const { data, error } = await client.from('items').select('id,name,rarity,price,kind,description');
+            /* Таблица items закрыта для кабинета: читаем публичную вьюху
+               (25_items_public.sql), где только витринные колонки. */
+            const { data, error } = await client
+                .from('items_public')
+                .select('id,name,rarity,price,kind,description');
             if (error) throw error;
             state.itemsCatalog = new Map((data || []).map((x) => [String(x.id), {
                 name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description

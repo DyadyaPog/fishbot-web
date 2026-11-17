@@ -60,7 +60,8 @@ insert into public.migration_order (idx, filename) values
     (23, '21_repair.sql'),
     (24, '22_sell_quantity.sql'),
     (25, '23_shop_state.sql'),
-    (26, '24_hardening.sql')
+    (26, '24_hardening.sql'),
+    (27, '25_items_public.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Заглушки для следующих шагов: раскомментируйте и впишите имя файла, когда
