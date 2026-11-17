@@ -232,7 +232,20 @@
             parts.push(`Вес: ${Number(meta.weight).toFixed(2)} кг`);
         }
         if (row.expires_at) parts.push(`Истекает: ${formatDateTime(row.expires_at)}`);
-        if (uiType(row.item_type) === 'FISH' && item.price != null) parts.push(`Цена: ${formatMoney(item.price)} 💰`);
+        if (uiType(row.item_type) === 'FISH' && item.price != null) parts.push(`Цена: ${formatMoney(item.price)}`);
+
+        const type = uiType(row.item_type);
+        if (ITEM_TYPES[type] && ITEM_TYPES[type].equippable && item.price != null) {
+            const maxUses = Number(meta.max_uses);
+            const uses = (meta.uses != null) ? Number(meta.uses) : maxUses;
+            let sellPrice = item.price;
+            if (Number.isFinite(maxUses) && maxUses > 0 && Number.isFinite(uses) && uses !== -1) {
+                sellPrice = Math.round(item.price * 0.5 * (uses / maxUses));
+            } else {
+                sellPrice = Math.round(item.price * 0.5);
+            }
+            parts.push(`Цена продажи: ${formatMoney(sellPrice)}`);
+        }
 
         if (!parts.length) {
             const type = uiType(row.item_type);
@@ -493,7 +506,7 @@
             return `
                 <div class="admin-event-row">
                     <div class="grow">
-                        <div class="item-name">${rarity.icon} ${esc(catchItem.name)}</div>
+                        <div class="item-name">🐟 ${esc(catchItem.name)}</div>
                         <div class="item-meta">${esc(catchItem.at)}</div>
                     </div>
                     <div class="item-details" style="color:${rarity.color}">${Number(catchItem.price) || 0} 💰</div>
@@ -606,14 +619,16 @@
         return `
             <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="border-left-color:${rarity.color}">
                 <div class="inv-head">
-                    <div class="inv-icon">${rarity.icon}</div>
+                                            <div class="inv-icon">${meta.icon}</div>
                     <div class="inv-title">
                         <div class="inv-name">${esc(item.name)}</div>
                         <div class="inv-rarity" style="color:${rarity.color}">${esc(item.rarity)} · ${meta.label}</div>
                     </div>
                     ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
                 </div>
-                <div class="inv-meta">${esc(item.meta || '')}</div>
+                ${item.item_type === 'FISH' && item.meta
+                    ? item.meta.split(' · ').filter(Boolean).map((part) => `<div class="inv-info-block">${esc(part)}</div>`).join('')
+                    : `<div class="inv-meta">${esc(item.meta || '')}</div>`}
                 ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
                 ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
                 ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
