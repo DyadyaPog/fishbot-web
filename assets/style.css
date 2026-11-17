@@ -1893,3 +1893,125 @@ body.auth-pending #channel-picker,
 body.auth-pending #user-chip,
 body.auth-pending #nav-refresh-data { visibility: hidden; }
 
+
+/* ---------- Магазин ---------- */
+
+/* Плашка в пункте «Магазин» и подсветка пункта при открытии артефактов. */
+.nav-badge {
+    margin-left: auto;
+    padding: 0.1rem 0.45rem;
+    border-radius: 999px;
+    font-size: 0.62rem;
+    font-weight: 800;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: #0b1220;
+    background: linear-gradient(135deg, var(--accent-tertiary), var(--accent-primary));
+}
+
+.nav-badge[hidden] { display: none; }
+
+.nav-links button.shop-hot {
+    color: var(--text-main);
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.22), rgba(56, 189, 248, 0.16));
+    box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.45);
+    animation: shopPulse 1.6s ease-in-out infinite;
+}
+
+@keyframes shopPulse {
+    0%, 100% { box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.45), 0 0 0 0 rgba(192, 132, 252, 0); }
+    50% { box-shadow: inset 0 0 0 1px rgba(192, 132, 252, 0.7), 0 0 18px 2px rgba(192, 132, 252, 0.35); }
+}
+
+/* Плашка открытого магазина: видна с любой вкладки кабинета. */
+.notice-shop {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    border-color: rgba(192, 132, 252, 0.45);
+    background: linear-gradient(135deg, rgba(192, 132, 252, 0.16), rgba(56, 189, 248, 0.1));
+}
+
+.notice-shop[hidden] { display: none; }
+
+.notice-shop.muted {
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(148, 163, 184, 0.08);
+}
+
+.notice-shop-icon { font-size: 1.15rem; }
+
+.notice-shop .grow { flex: 1; min-width: 0; }
+
+.notice-shop-action {
+    flex: 0 0 auto;
+    padding: 0.35rem 0.8rem;
+    border-radius: 9px;
+    border: 1px solid rgba(192, 132, 252, 0.5);
+    background: rgba(192, 132, 252, 0.18);
+    color: var(--text-main);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.notice-shop-action:hover { background: rgba(192, 132, 252, 0.32); }
+
+/* Страницы редкости: те же шесть шагов, что в !shop. */
+.shop-pages {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+}
+
+.shop-page {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid var(--glass-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text-muted);
+    font-family: inherit;
+    font-size: 0.8rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.shop-page:hover {
+    border-color: var(--glass-border-hover);
+    color: var(--text-main);
+}
+
+.shop-page.active {
+    color: var(--text-main);
+    border-color: var(--accent-primary);
+    background: rgba(56, 189, 248, 0.14);
+    box-shadow: 0 0 14px rgba(56, 189, 248, 0.18);
+}
+
+.shop-page-icon { font-size: 0.9rem; }
+
+/* Магазин артефактов: панель подсвечивается, пока окно открыто. */
+.shop-artifact-panel { margin-top: 1.5rem; }
+
+.shop-artifact-panel.shop-open {
+    border-color: rgba(192, 132, 252, 0.5);
+    box-shadow: 0 0 26px rgba(192, 132, 252, 0.16);
+}
+
+.shop-artifact-body { padding: 1.25rem 1.5rem; }
+
+.shop-lock {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--warning);
+}
+
+.shop-item { height: 100%; }
+
+.shop-item .inv-actions { margin-top: auto; }

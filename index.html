@@ -25,6 +25,7 @@
             <li><button onclick="showTab('profile')" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
             <li><button onclick="showTab('inventory')" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
             <li><button onclick="showTab('artifacts')" id="btn-artifacts"><span class="nav-icon">🔮</span><span>Артефакты</span></button></li>
+            <li><button onclick="showTab('shop')" id="btn-shop"><span class="nav-icon">🛒</span><span>Магазин</span><span class="nav-badge" id="shop-badge" hidden>открыт</span></button></li>
             <li><button onclick="showTab('loadout')" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
             <li id="nav-refresh-data" hidden><button id="btn-refresh-data" onclick="refreshAllData()"><span class="nav-icon">↻</span><span>Обновить данные</span></button></li>
         </ul>
@@ -58,6 +59,9 @@
                 <button class="btn-action btn-stop" id="btn-login" onclick="handleLogin()">Войти через Twitch</button>
             </div>
         </header>
+
+        <!-- Открытие магазина артефактов видно с любой вкладки: бот пишет окно в shop_state. -->
+        <div class="notice notice-shop" id="shop-alert" hidden></div>
 
         <div class="notice notice-warn" id="setup-notice" hidden>
             Supabase не настроен: укажите <code>supabaseUrl</code> и <code>supabaseAnonKey</code> в
@@ -179,6 +183,26 @@
                 <span class="inventory-counter" id="artifacts-counter">0 артефактов</span>
             </div>
             <div id="artifacts-grid" class="inventory-grid"></div>
+        </section>
+
+        <!-- МАГАЗИН -->
+        <section id="shop" class="tab-content">
+            <div class="filters-row">
+                <div class="shop-pages" id="shop-pages"></div>
+                <span class="inventory-counter" id="shop-counter">0 предметов</span>
+            </div>
+
+            <div id="shop-grid" class="inventory-grid"></div>
+
+            <div class="dashboard-panel shop-artifact-panel animate-up" id="artifact-shop-panel">
+                <div class="panel-header">
+                    <div class="panel-title"><span class="panel-icon">🔮</span> Магазин артефактов</div>
+                    <span class="chances-caption" id="artifact-shop-status">закрыт</span>
+                </div>
+                <div class="shop-artifact-body">
+                    <div id="artifact-shop-grid" class="inventory-grid"></div>
+                </div>
+            </div>
         </section>
 
         <!-- ЭКИПИРОВКА -->

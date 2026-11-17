@@ -214,22 +214,76 @@
         filters: { type: 'all', rarity: 'all', q: '' },
         /* Локальный кэш справочника items (имя/редкость/цена/тип/описание). */
         itemsCatalog: new Map(),
-        itemsCatalogLoaded: false
+        itemsCatalogLoaded: false,
+        /* Магазин: выбранная страница редкости и кэш витрины по редкости. */
+        shopRarity: 'common',
+        shopItemsByRarity: new Map(),
+        /* Окно магазина артефактов по каналам: channelId → время закрытия (мс). */
+        shopState: new Map(),
+        /* Какие окна уже показаны в тосте: channelId → время закрытия. */
+        shopAnnounced: new Map(),
+        shopWasOpen: false,
+        shopMinutes: 0,
+        /* Realtime-канал shop_state: подписка живёт до выхода из аккаунта. */
+        shopChannel: null
     };
 
     const TITLES = {
         profile: 'Профиль',
         inventory: 'Инвентарь',
         artifacts: 'Артефакты',
+        shop: 'Магазин',
         loadout: 'Экипировка',
         rankings: 'Рейтинг'
     };
+
+    /* Страницы магазина: те же шесть редкостей и тот же порядок, что в !shop бота. */
+    const RARITY_PAGE_KEYS = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+
+    /* Подписи и иконки товаров совпадают с EQUIPMENT_DETAILS / ARTIFACT_DETAILS бота. */
+    const SHOP_KIND_DETAILS = {
+        rod: { label: 'Удочка', icon: '🎣' },
+        line: { label: 'Леска', icon: '🧵' },
+        hook: { label: 'Крючок', icon: '🪝' },
+        bait: { label: 'Наживка', icon: '🪱' },
+        artifact: { label: 'Артефакт', icon: '🔮' }
+    };
+
+    /* Демо-витрина: те же поля, что отдаёт shop_items, но без сети. */
+    const DEMO_SHOP = [
+        { id: 'rod_common', name: 'Бамбуковая удочка', rarity: 'common', price: 900, levelRequired: 1, kind: 'rod', artifactType: null },
+        { id: 'line_common', name: 'Обычная леска', rarity: 'common', price: 650, levelRequired: 1, kind: 'line', artifactType: null },
+        { id: 'hook_common', name: 'Простой крючок', rarity: 'common', price: 450, levelRequired: 1, kind: 'hook', artifactType: null },
+        { id: 'bait_worm', name: 'Червь', rarity: 'common', price: 60, levelRequired: 1, kind: 'bait', artifactType: null },
+        { id: 'art_sock', name: 'Носок с дыркой', rarity: 'common', price: 3000, levelRequired: 1, kind: 'artifact', artifactType: 'catch' },
+        { id: 'rod_uncommon', name: 'Карбоновая удочка', rarity: 'uncommon', price: 3600, levelRequired: 8, kind: 'rod', artifactType: null },
+        { id: 'bait_dough', name: 'Тесто', rarity: 'uncommon', price: 160, levelRequired: 8, kind: 'bait', artifactType: null },
+        { id: 'art_spoon', name: 'Позолоченная ложка деда', rarity: 'uncommon', price: 12000, levelRequired: 8, kind: 'artifact', artifactType: 'gold' },
+        { id: 'rod_rare', name: 'Удочка мастера', rarity: 'rare', price: 8500, levelRequired: 20, kind: 'rod', artifactType: null },
+        { id: 'bait_spoon', name: 'Блесна', rarity: 'rare', price: 450, levelRequired: 22, kind: 'bait', artifactType: null },
+        { id: 'art_glass_float', name: 'Стеклянный поплавок', rarity: 'rare', price: 35000, levelRequired: 20, kind: 'artifact', artifactType: 'comfort' },
+        { id: 'rod_epic', name: 'Удочка глубин', rarity: 'epic', price: 15500, levelRequired: 30, kind: 'rod', artifactType: null },
+        { id: 'rod_legendary', name: 'Посох Океана', rarity: 'legendary', price: 25800, levelRequired: 40, kind: 'rod', artifactType: null },
+        { id: 'art_tide_crown', name: 'Корона Прилива', rarity: 'legendary', price: 180000, levelRequired: 40, kind: 'artifact', artifactType: 'treasure' },
+        { id: 'rod_mythic', name: 'Жезл Посейдона', rarity: 'mythic', price: 40000, levelRequired: 50, kind: 'rod', artifactType: null },
+        { id: 'art_poseidon_seal', name: 'Печать Посейдона', rarity: 'mythic', price: 400000, levelRequired: 50, kind: 'artifact', artifactType: 'catch' }
+    ];
 
     const el = (id) => document.getElementById(id);
 
     const esc = (value) => String(value == null ? '' : value).replace(/[&<>"']/g, (ch) => ({
         '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     }[ch]));
+
+    /* Русская форма числительного: 1 предмет, 2 предмета, 5 предметов. */
+    function plural(count, one, few, many) {
+        const value = Math.abs(Number(count) || 0) % 100;
+        const last = value % 10;
+        if (value > 10 && value < 20) return many;
+        if (last === 1) return one;
+        if (last >= 2 && last <= 4) return few;
+        return many;
+    }
 
     const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -431,6 +485,11 @@
                 : (state.channels[0] ? state.channels[0].id : null);
 
             if (state.channelId) await loadChannel(state.channelId);
+
+            /* Магазин: окно артефактов из базы + подписка на его открытие. */
+            await loadShopState();
+            subscribeShopState();
+            startShopTicker();
 
             setStatus(state.username ? `Twitch · ${state.username}` : 'Вход выполнен', true);
             renderAll();
@@ -643,7 +702,9 @@
         const title = el('page-title');
         if (title) title.textContent = TITLES[name] || 'Кабинет';
 
-        if (name === 'inventory' || name === 'artifacts' || name === 'loadout') {
+        if (name === 'shop') {
+            openShopTab();
+        } else if (name === 'inventory' || name === 'artifacts' || name === 'loadout') {
             refreshSellPrices();
         }
     }
@@ -682,6 +743,12 @@
         state.channelId = id;
         rememberChannel(id);
         if (!state.demo) await loadChannel(id);
+
+        /* У каждого канала своё окно магазина: сбрасываем прошлое состояние. */
+        const channelForShop = currentChannel();
+        state.shopWasOpen = Boolean(channelForShop && isArtifactShopOpen(channelForShop.id));
+        state.shopMinutes = state.shopWasOpen ? shopMinutesLeft(channelForShop.id) : 0;
+
         renderAll();
 
         const channel = currentChannel();
@@ -1091,7 +1158,7 @@
         if (!grid) return;
         const items = currentInventory().filter((item) => item.item_type === 'ARTIFACT');
         const counter = el('artifacts-counter');
-        if (counter) counter.textContent = `${items.length} артефактов`;
+        if (counter) counter.textContent = `${items.length} ${plural(items.length, 'артефакт', 'артефакта', 'артефактов')}`;
 
         if (items.length === 0) {
             grid.innerHTML = `
@@ -1127,6 +1194,470 @@
         `).join('');
     }
 
+    /* ---------- Магазин ---------- */
+
+    function artifactShopUntil(channelId) {
+        return Number(state.shopState.get(String(channelId)) || 0);
+    }
+
+    function isArtifactShopOpen(channelId) {
+        return artifactShopUntil(channelId) > Date.now();
+    }
+
+    function shopMinutesLeft(channelId) {
+        return Math.max(1, Math.ceil((artifactShopUntil(channelId) - Date.now()) / 60000));
+    }
+
+    /* Окно магазина приходит из shop_state: его пишет только бот. */
+    function applyShopState(rows) {
+        const next = new Map();
+        for (const row of rows || []) {
+            const until = row.artifact_open_until ? new Date(row.artifact_open_until).getTime() : 0;
+            next.set(String(row.channel_id), Number.isFinite(until) ? until : 0);
+        }
+        state.shopState = next;
+
+        const channel = currentChannel();
+        state.shopWasOpen = Boolean(channel && isArtifactShopOpen(channel.id));
+        state.shopMinutes = channel && state.shopWasOpen ? shopMinutesLeft(channel.id) : 0;
+
+        renderShopNav();
+        renderShopAlert();
+        renderArtifactShop();
+    }
+
+    /* Читаем окно только своих каналов: чужие магазины кабинету не нужны. */
+    async function loadShopState() {
+        if (!SUPABASE_READY || !client || state.demo) return;
+        const ids = state.channels
+            .map((channel) => Number(channel.id))
+            .filter((id) => Number.isFinite(id));
+        if (!ids.length) return;
+
+        try {
+            const { data, error } = await client
+                .from('shop_state')
+                .select('channel_id,artifact_open_until')
+                .in('channel_id', ids);
+            if (error) throw error;
+            applyShopState(data || []);
+        } catch (error) {
+            console.warn('shop_state:', error.message);
+        }
+    }
+
+    /* Realtime: открытие магазина приходит без обновления страницы. */
+    function subscribeShopState() {
+        if (!SUPABASE_READY || !client || state.demo || state.shopChannel) return;
+
+        try {
+            state.shopChannel = client
+                .channel('shop-state')
+                .on(
+                    'postgres_changes',
+                    { event: '*', schema: 'public', table: 'shop_state' },
+                    (payload) => {
+                        const row = payload.new && Object.keys(payload.new).length
+                            ? payload.new
+                            : payload.old;
+                        if (!row || row.channel_id == null) {
+                            loadShopState();
+                            return;
+                        }
+
+                        const id = String(row.channel_id);
+                        if (!state.channels.some((channel) => channel.id === id)) return;
+
+                        const until = payload.eventType === 'DELETE' || !row.artifact_open_until
+                            ? 0
+                            : new Date(row.artifact_open_until).getTime();
+                        state.shopState.set(id, Number.isFinite(until) ? until : 0);
+                        handleShopStateChange(id);
+                    }
+                )
+                .subscribe();
+        } catch (error) {
+            console.warn('shop_state realtime:', error.message);
+        }
+    }
+
+    function unsubscribeShopState() {
+        if (state.shopChannel && client) {
+            try { client.removeChannel(state.shopChannel); } catch (e) { /* приватный режим */ }
+        }
+        state.shopChannel = null;
+    }
+
+    /* Открытие магазина: тост и подсветка, но только один раз на окно. */
+    function handleShopStateChange(channelId) {
+        const channel = state.channels.find((entry) => entry.id === channelId);
+        const open = isArtifactShopOpen(channelId);
+        const until = artifactShopUntil(channelId);
+
+        if (open && state.shopAnnounced.get(channelId) !== until) {
+            state.shopAnnounced.set(channelId, until);
+            if (channelId === state.channelId) {
+                toast(`🔮 Магазин артефактов открыт: ${shopMinutesLeft(channelId)} мин.`);
+            } else if (channel) {
+                toast(`🔔 Магазин артефактов открыт на канале ${channel.displayName}`);
+            }
+        }
+
+        const current = currentChannel();
+        state.shopWasOpen = Boolean(current && isArtifactShopOpen(current.id));
+        state.shopMinutes = current && state.shopWasOpen ? shopMinutesLeft(current.id) : 0;
+
+        renderShopNav();
+        renderShopAlert();
+        renderShop();
+        renderArtifactShop();
+    }
+
+    /* Пункт «Магазин» подсвечивается, чтобы открытие не пропустили. */
+    function renderShopNav() {
+        const button = el('btn-shop');
+        const badge = el('shop-badge');
+        if (!button || !badge) return;
+
+        const current = currentChannel();
+        const anyOpen = state.channels.some((channel) => isArtifactShopOpen(channel.id));
+        const currentOpen = Boolean(current && isArtifactShopOpen(current.id));
+
+        button.classList.toggle('shop-hot', anyOpen);
+        badge.hidden = !anyOpen;
+        badge.textContent = currentOpen ? 'открыт' : 'другой канал';
+    }
+
+    /* Плашка видна с любой вкладки: открыт здесь — или на другом канале. */
+    function renderShopAlert() {
+        const node = el('shop-alert');
+        if (!node) return;
+
+        const current = currentChannel();
+        if (!current) {
+            node.hidden = true;
+            return;
+        }
+
+        if (isArtifactShopOpen(current.id)) {
+            node.className = 'notice notice-shop';
+            node.innerHTML = `<span class="notice-shop-icon">🔮</span>
+                <span class="grow">Магазин артефактов открыт — закрывается через ${shopMinutesLeft(current.id)} мин.</span>
+                <button class="notice-shop-action" data-action="open-artifacts">К артефактам</button>`;
+            node.hidden = false;
+            return;
+        }
+
+        const other = state.channels.find((channel) =>
+            channel.id !== current.id && isArtifactShopOpen(channel.id)
+        );
+
+        if (other) {
+            node.className = 'notice notice-shop muted';
+            node.innerHTML = `<span class="notice-shop-icon">🔔</span>
+                <span class="grow">Магазин артефактов открыт на канале <b>${esc(other.displayName)}</b> — вы смотрите ${esc(current.displayName)}.</span>
+                <button class="notice-shop-action" data-action="switch-shop-channel" data-channel="${esc(other.id)}">Перейти</button>`;
+            node.hidden = false;
+            return;
+        }
+
+        node.hidden = true;
+    }
+
+    function shopItemsFor(rarity) {
+        return state.shopItemsByRarity.get(String(rarity)) || null;
+    }
+
+    function shopKindDetails(kind) {
+        return SHOP_KIND_DETAILS[kind] || { label: kind || 'Предмет', icon: '❔' };
+    }
+
+    /* Типы артефактов, которые уже заняты: второй такой же не купить. */
+    function ownedArtifactTypes() {
+        const types = new Set();
+        for (const item of currentInventory()) {
+            if (item.item_type === 'ARTIFACT' && item.artifactType) types.add(item.artifactType);
+        }
+        return types;
+    }
+
+    /* Те же ограничения, что проверяет RPC: показываем их до нажатия. */
+    function shopBlockReason(item) {
+        const channel = currentChannel();
+        if (!channel) return '';
+
+        const level = Number(channel.player.level) || 1;
+        const balance = Number(channel.player.balance) || 0;
+
+        if (level < item.levelRequired) return `Нужен ${item.levelRequired} ур.`;
+        if (item.kind === 'artifact' && !isArtifactShopOpen(channel.id)) return 'Магазин закрыт';
+        if (item.kind === 'artifact' && ownedArtifactTypes().has(item.artifactType)) return 'Тип уже занят';
+        if (balance < item.price) return 'Не хватает золота';
+        return '';
+    }
+
+    function renderShopCard(item) {
+        const rarity = RARITY[item.rarity] || RARITY.empty;
+        const kind = shopKindDetails(item.kind);
+        const reason = shopBlockReason(item);
+        const artifactType = item.kind === 'artifact' && item.artifactType
+            ? ARTIFACT_TYPES[item.artifactType]
+            : null;
+        const typeLabel = artifactType
+            ? `${kind.label} · ${artifactType.emoji} ${artifactType.label}`
+            : kind.label;
+
+        return `
+            <div class="inv-item shop-item" style="--rarity-color:${rarity.color}; border-left-color:${rarity.color}">
+                <div class="inv-head">
+                    <div class="inv-icon">${kind.icon}</div>
+                    <div class="inv-title">
+                        <div class="inv-name">${esc(item.name)}</div>
+                        <div class="inv-rarity" style="color:${rarity.color}">${esc(RARITY_LABELS[item.rarity] || item.rarity)} · ${esc(typeLabel)}</div>
+                    </div>
+                </div>
+                <div class="inv-info-block">${esc(`Цена: ${formatMoney(item.price)}`)}</div>
+                <div class="inv-info-block">${esc(`Минимальный уровень: ${item.levelRequired}`)}</div>
+                ${reason ? `<div class="shop-lock">${esc(reason)}</div>` : ''}
+                <div class="inv-actions">
+                    <button class="btn-admin primary" data-action="shop-buy" data-item="${esc(item.id)}" data-kind="${esc(item.kind)}"${reason ? ' disabled' : ''}>Купить</button>
+                </div>
+            </div>
+        `;
+    }
+
+    function renderShopPages() {
+        const host = el('shop-pages');
+        if (!host) return;
+
+        host.innerHTML = RARITY_PAGE_KEYS.map((key) => {
+            const active = key === state.shopRarity ? ' active' : '';
+            return `<button class="shop-page${active}" data-action="shop-rarity" data-rarity="${key}">
+                <span class="shop-page-icon">${RARITY_EFFECT_ICONS[key] || '❔'}</span>${esc(RARITY_LABELS[key] || key)}
+            </button>`;
+        }).join('');
+    }
+
+    /* Витрина снаряжения: артефакты живут в отдельном магазине ниже. */
+    function renderShop() {
+        renderShopPages();
+        renderShopNav();
+        renderShopAlert();
+        renderArtifactShop();
+
+        const grid = el('shop-grid');
+        const counter = el('shop-counter');
+        if (!grid) return;
+
+        if (!state.channels.length) {
+            grid.innerHTML = '<div class="empty-state">Войдите через Twitch, чтобы увидеть магазин</div>';
+            if (counter) counter.textContent = '—';
+            return;
+        }
+
+        const items = state.demo
+            ? DEMO_SHOP.filter((item) => item.rarity === state.shopRarity && item.kind !== 'artifact')
+            : shopItemsFor(state.shopRarity);
+
+        if (!items) {
+            grid.innerHTML = '<div class="empty-state">Загрузка магазина…</div>';
+            if (counter) counter.textContent = '—';
+            ensureShopItems();
+            return;
+        }
+
+        const equipment = items.filter((item) => item.kind !== 'artifact');
+        if (counter) counter.textContent = `${equipment.length} ${plural(equipment.length, 'предмет', 'предмета', 'предметов')}`;
+        grid.innerHTML = equipment.length
+            ? equipment.map(renderShopCard).join('')
+            : '<div class="empty-state">На этой странице магазина ничего нет</div>';
+    }
+
+    /* Магазин артефактов виден только когда бот открыл окно. */
+    function renderArtifactShop() {
+        const grid = el('artifact-shop-grid');
+        const panel = el('artifact-shop-panel');
+        const status = el('artifact-shop-status');
+        if (!grid || !panel) return;
+
+        const channel = currentChannel();
+        const open = Boolean(channel && isArtifactShopOpen(channel.id));
+        panel.classList.toggle('shop-open', open);
+
+        if (status) {
+            status.textContent = open
+                ? `закрывается через ${shopMinutesLeft(channel.id)} мин`
+                : 'закрыт';
+        }
+
+        if (!open) {
+            grid.innerHTML = '<div class="empty-state">Магазин закрыт: бот открывает его ненадолго. Когда он откроется, пункт «Магазин» подсветится, а здесь появятся артефакты.</div>';
+            return;
+        }
+
+        const items = state.demo
+            ? DEMO_SHOP.filter((item) => item.rarity === state.shopRarity && item.kind === 'artifact')
+            : shopItemsFor(state.shopRarity);
+
+        if (!items) {
+            grid.innerHTML = '<div class="empty-state">Загрузка магазина…</div>';
+            return;
+        }
+
+        const artifacts = items.filter((item) => item.kind === 'artifact');
+        grid.innerHTML = artifacts.length
+            ? artifacts.map(renderShopCard).join('')
+            : '<div class="empty-state">На этой странице артефактов нет</div>';
+    }
+
+    /* Витрину отдаёт shop_items: бот и кабинет читают один каталог. */
+    async function loadShopItems(rarity, force) {
+        if (!SUPABASE_READY || !client || state.demo) return null;
+
+        const key = String(rarity);
+        if (!force && state.shopItemsByRarity.has(key)) return state.shopItemsByRarity.get(key);
+
+        const { data, error } = await client.rpc('shop_items', { p_rarity: key });
+        if (error) {
+            console.warn('shop_items:', error.message);
+            state.shopItemsByRarity.set(key, []);
+            toast('Не удалось загрузить магазин');
+            return [];
+        }
+
+        const items = (data || []).map((row) => ({
+            id: String(row.item_id),
+            name: row.name,
+            rarity: row.rarity,
+            price: Number(row.price) || 0,
+            levelRequired: Number(row.level_required) || 1,
+            kind: row.kind,
+            artifactType: row.artifact_type || null
+        }));
+
+        state.shopItemsByRarity.set(key, items);
+        return items;
+    }
+
+    let shopRequestInFlight = false;
+
+    async function ensureShopItems(force) {
+        if (shopRequestInFlight || state.demo || !SUPABASE_READY || !state.channels.length) return;
+
+        const key = state.shopRarity;
+        if (!force && state.shopItemsByRarity.has(key)) return;
+
+        shopRequestInFlight = true;
+        try {
+            await loadShopItems(key, force);
+        } finally {
+            shopRequestInFlight = false;
+            renderShop();
+        }
+    }
+
+    async function openShopTab(options = {}) {
+        renderShop();
+        await loadShopState();
+        await ensureShopItems(false);
+
+        const panel = el('artifact-shop-panel');
+        if (options.artifacts && panel && panel.scrollIntoView) {
+            panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    }
+
+    /* Покупка: уровень, место, деньги, тип артефакта и окно магазина
+       проверяет база (buy_item / buy_artifact), кабинет только показывает итог. */
+    async function buyShopItem(rawId, rawKind) {
+        const channel = currentChannel();
+        if (!channel) return;
+
+        const item = (shopItemsFor(state.shopRarity) || []).find((entry) => entry.id === rawId)
+            || DEMO_SHOP.find((entry) => entry.id === rawId);
+        if (!item) return;
+
+        if (state.demo) {
+            toast('Демо-режим: покупки недоступны');
+            return;
+        }
+        if (!client) return;
+
+        const reason = shopBlockReason(item);
+        if (reason) {
+            toast(reason);
+            return;
+        }
+
+        if (!window.confirm(`Купить «${item.name}» за ${formatMoney(item.price)}?`)) return;
+
+        const isArtifact = rawKind === 'artifact' || item.kind === 'artifact';
+        const payload = {
+            p_item_id: item.id,
+            p_channel_id: Number(channel.id)
+        };
+        if (!isArtifact) payload.p_quantity = 1;
+
+        const { data, error } = await client.rpc(isArtifact ? 'buy_artifact' : 'buy_item', payload);
+
+        if (error) {
+            console.error(error);
+            toast(`Не удалось купить: ${shortError(error)}`);
+            return;
+        }
+
+        if (!data || data.ok !== true) {
+            toast((data && data.error) || 'Не удалось купить предмет');
+            if (data && data.code === 'shop_closed') await loadShopState();
+            renderShop();
+            return;
+        }
+
+        if (data.balance != null) channel.player.balance = Number(data.balance) || 0;
+
+        await reloadInventory(channel.id);
+        await ensureShopItems(true);
+
+        renderProfile();
+        renderInventory();
+        renderArtifacts();
+        renderLoadout();
+        renderShop();
+
+        const curse = isArtifact && data.cursed ? ' — проклят ☠️' : '';
+        toast(`Куплено: ${data.name || item.name}${curse}`);
+    }
+
+    /* Обратный отсчёт окна: секунды обновляют подписи, закрытие — перерисовку.
+       Опрос раз в минуту страхует Realtime при обрыве связи. */
+    let shopTicker = null;
+    let shopPollAt = 0;
+
+    function startShopTicker() {
+        if (shopTicker) return;
+
+        shopTicker = setInterval(() => {
+            const channel = currentChannel();
+            if (!channel || state.demo || !state.channels.length) return;
+
+            const open = isArtifactShopOpen(channel.id);
+            const minutes = open ? shopMinutesLeft(channel.id) : 0;
+
+            if (open !== state.shopWasOpen) {
+                handleShopStateChange(channel.id);
+            } else if (open && minutes !== state.shopMinutes) {
+                state.shopMinutes = minutes;
+                renderShopAlert();
+                renderArtifactShop();
+            }
+
+            if (Date.now() > shopPollAt) {
+                shopPollAt = Date.now() + 60000;
+                loadShopState();
+            }
+        }, 1000);
+    }
+
     function renderAll() {
         renderChannels();
         renderChip();
@@ -1135,6 +1666,7 @@
         renderArtifacts();
         renderLoadout();
         renderRankings();
+        renderShop();
     }
 
     function setFilter(key, value) {
@@ -1312,6 +1844,14 @@
             : state.channels[0].id;
         state.username = state.channels[0].player.username;
 
+        /* Демо: магазин артефактов открыт только на втором канале — так видно
+           и уведомление про другой канал, и переход к артефактам. */
+        state.shopState = new Map();
+        state.shopAnnounced = new Map();
+        if (state.channels[0]) state.shopState.set(state.channels[0].id, 0);
+        if (state.channels[1]) state.shopState.set(state.channels[1].id, Date.now() + 8 * 60 * 1000);
+        state.shopWasOpen = isArtifactShopOpen(state.channelId);
+
         setStatus('Демо-данные', true);
         renderAll();
         showTab('profile');
@@ -1324,8 +1864,11 @@
             state.channels = [];
             state.channelId = null;
             state.username = '';
+            state.shopState = new Map();
+            state.shopWasOpen = false;
             if (state.session) { loadPlayer(); return; }
             setStatus('Гостевой режим', false);
+            renderShop();
             renderAuthOnly();
             renderChannels();
             renderChip();
@@ -1367,6 +1910,8 @@
             clearSupabaseSessionStorage();
         }
 
+        unsubscribeShopState();
+
         state.session = false;
         state.loaded = false;
         state.demo = false;
@@ -1374,6 +1919,10 @@
         state.channels = [];
         state.channelId = null;
         state.username = '';
+        state.shopState = new Map();
+        state.shopAnnounced = new Map();
+        state.shopWasOpen = false;
+        state.shopItemsByRarity = new Map();
 
         setStatus('Гостевой режим', false);
         renderAuthOnly();
@@ -1384,6 +1933,7 @@
         renderArtifacts();
         renderLoadout();
         renderRankings();
+        renderShop();
         toast('Вы вышли из аккаунта');
     }
 
@@ -1393,7 +1943,10 @@
             state.channels = [];
             state.channelId = null;
             state.username = '';
+            state.shopState = new Map();
+            state.shopWasOpen = false;
             setStatus('Гостевой режим', false);
+            renderShop();
             renderAuthOnly();
             renderChannels();
             renderChip();
@@ -1494,8 +2047,39 @@
             requestChancesRefresh(button.dataset.channel);
         });
 
+        document.addEventListener('click', (event) => {
+            const page = event.target.closest('[data-action="shop-rarity"]');
+            if (page) {
+                state.shopRarity = page.dataset.rarity;
+                renderShop();
+                ensureShopItems();
+                return;
+            }
+
+            const buy = event.target.closest('[data-action="shop-buy"]');
+            if (buy && !buy.disabled) {
+                buyShopItem(buy.dataset.item, buy.dataset.kind);
+                return;
+            }
+
+            const artifacts = event.target.closest('[data-action="open-artifacts"]');
+            if (artifacts) {
+                showTab('shop');
+                openShopTab({ artifacts: true });
+                return;
+            }
+
+            const otherChannel = event.target.closest('[data-action="switch-shop-channel"]');
+            if (otherChannel) {
+                selectChannel(otherChannel.dataset.channel);
+                showTab('shop');
+            }
+        });
+
         document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') refreshSellPrices();
+            if (document.visibilityState !== 'visible') return;
+            refreshSellPrices();
+            loadShopState();
         });
 
         window.addEventListener('resize', scheduleCatchesMinHeight);
