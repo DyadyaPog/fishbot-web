@@ -1758,3 +1758,13 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     .main-header { flex-wrap: wrap; gap: 1rem; }
     .header-actions { flex-wrap: wrap; }
 }
+
+/* Пока проверяется сохранённая сессия, не показываем гостевой экран и
+   кнопки входа — иначе на секунду мелькает «будто не авторизован». */
+body.auth-pending #guest,
+body.auth-pending #btn-login,
+body.auth-pending #btn-demo,
+body.auth-pending #channel-picker,
+body.auth-pending #user-chip,
+body.auth-pending #nav-refresh-data { visibility: hidden; }
+

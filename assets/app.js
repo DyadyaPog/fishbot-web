@@ -1288,18 +1288,31 @@
 
     /* Сессию после redirect разбирает supabase-js; здесь только догружаем данные. */
     async function startSession() {
-        if (!SUPABASE_READY) return;
+        if (!SUPABASE_READY) {
+            document.body.classList.remove('auth-pending');
+            setStatus('Гостевой режим', false);
+            renderAuthOnly();
+            return;
+        }
 
         try {
             const { data, error } = await client.auth.getSession();
             if (error) throw error;
-            if (!data.session) return;
+            if (!data.session) {
+                document.body.classList.remove('auth-pending');
+                setStatus('Гостевой режим', false);
+                renderAuthOnly();
+                return;
+            }
             state.session = true;
             await loadPlayer();
         } catch (error) {
             console.error(error);
             setStatus('Гостевой режим', false);
+            renderAuthOnly();
             toast(`Не удалось восстановить сессию: ${shortError(error)}`);
+        } finally {
+            document.body.classList.remove('auth-pending');
         }
     }
 
@@ -1350,8 +1363,10 @@
         bind();
         renderChannels();
         renderRankings();
-        setStatus('Гостевой режим', false);
-        renderAuthOnly();
+        /* Гостевой экран не показываем до проверки сессии. */
+        setStatus('Проверка входа…', true);
+        /* Страховка: если getSession завис, через 5 секунд показываем гостя. */
+        setTimeout(() => document.body.classList.remove('auth-pending'), 5000);
         startSession();
     });
 })();
