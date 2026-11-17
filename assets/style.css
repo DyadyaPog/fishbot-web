@@ -1996,8 +1996,32 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
 
 .shop-page-icon { font-size: 0.9rem; }
 
-/* Магазин артефактов: панель подсвечивается, пока окно открыто. */
-.shop-artifact-panel { margin-top: 1.5rem; }
+/* Магазин артефактов: панель не растягивается на всю ширину — ширина по содержимому, по центру. */
+.shop-artifact-panel {
+    margin: 1.5rem auto 0;
+    width: fit-content;
+    max-width: 100%;
+    min-width: 300px;
+}
+
+/* Заголовок панели: название и статус не слипаются. */
+.shop-artifact-panel .panel-header {
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+/* Статус «закрывается через N мин» — отдельная пилюля, а не текст в строку. */
+#artifact-shop-status {
+    padding: 0.25rem 0.65rem;
+    border-radius: 999px;
+    background: rgba(192, 132, 252, 0.12);
+    border: 1px solid rgba(192, 132, 252, 0.35);
+    color: #c084fc;
+    font-weight: 700;
+    font-size: 0.72rem;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+}
 
 .shop-artifact-panel.shop-open {
     border-color: rgba(192, 132, 252, 0.5);
