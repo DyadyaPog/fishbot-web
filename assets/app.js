@@ -35,6 +35,12 @@
         return String((error && error.message) || error || 'неизвестная ошибка').slice(0, 160);
     }
 
+    function inventoryLimitForLevel(level) {
+        const safeLevel = Math.max(0, Number(level) || 0);
+        const bonus = Math.floor(safeLevel / 5);
+        return 10 + Math.min(10, bonus);
+    }
+
     const RARITY = {
         common: { icon: '🐟', color: 'var(--rarity-common)' },
         uncommon: { icon: '✨', color: 'var(--rarity-uncommon)' },
@@ -150,6 +156,7 @@
     const TITLES = {
         profile: 'Профиль',
         inventory: 'Инвентарь',
+        artifacts: 'Артефакты',
         loadout: 'Экипировка',
         rankings: 'Рейтинг'
     };
@@ -219,12 +226,13 @@
         const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
         const parts = [];
 
-        if (meta.uses != null && meta.max_uses != null) parts.push(`Прочность ${meta.uses} / ${meta.max_uses}`);
-        else if (meta.max_uses != null) parts.push(`Прочность ${meta.max_uses}`);
+        if (meta.uses != null && meta.max_uses != null) parts.push(`Прочность: ${meta.uses}/${meta.max_uses}`);
+        else if (meta.max_uses != null) parts.push(`Прочность: ${meta.max_uses}`);
         if (meta.weight != null && Number.isFinite(Number(meta.weight))) {
-            parts.push(`Вес ${Number(meta.weight).toFixed(2)} кг`);
+            parts.push(`Вес: ${Number(meta.weight).toFixed(2)} кг`);
         }
-        if (row.expires_at) parts.push(`до ${formatDateTime(row.expires_at)}`);
+        if (row.expires_at) parts.push(`Истекает: ${formatDateTime(row.expires_at)}`);
+        if (uiType(row.item_type) === 'FISH' && item.price != null) parts.push(`Цена: ${formatMoney(item.price)} 💰`);
 
         if (!parts.length) {
             const type = uiType(row.item_type);
@@ -499,6 +507,12 @@
         const slots = ['ROD', 'LINE', 'HOOK', 'BAIT'];
         const inventory = currentInventory();
 
+        const loadoutGrid = el('loadout-grid');
+        if (loadoutGrid) {
+            const equipmentItems = inventory.filter((item) => ITEM_TYPES[item.item_type] && ITEM_TYPES[item.item_type].equippable);
+            loadoutGrid.innerHTML = equipmentItems.map(renderItemCard).join('');
+        }
+
         el('slot-grid').innerHTML = slots.map((type) => {
             const meta = ITEM_TYPES[type];
             const item = inventory.find((entry) => entry.item_type === type && entry.is_equipped);
@@ -573,60 +587,78 @@
         return effects.map(formatArtifactEffect).join(', ');
     }
 
+    function renderItemCard(item) {
+        const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
+        const rarity = RARITY[item.rarity] || RARITY.empty;
+        const id = String(item.id);
+
+        const action = meta.equippable
+            ? (item.is_equipped
+                ? `<button class="btn-admin" data-action="unequip" data-id="${esc(id)}">Снять</button>`
+                : `<button class="btn-admin primary" data-action="equip" data-id="${esc(id)}">Экипировать</button>`)
+            : '';
+
+        const sellButton = '<button class="btn-admin" disabled title="Появится вместе с логикой продажи">Продать</button>';
+        const secondary = item.item_type === 'CONSUMABLE'
+            ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
+            : sellButton;
+
+        return `
+            <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="border-left-color:${rarity.color}">
+                <div class="inv-head">
+                    <div class="inv-icon">${rarity.icon}</div>
+                    <div class="inv-title">
+                        <div class="inv-name">${esc(item.name)}</div>
+                        <div class="inv-rarity" style="color:${rarity.color}">${esc(item.rarity)} · ${meta.label}</div>
+                    </div>
+                    ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
+                </div>
+                <div class="inv-meta">${esc(item.meta || '')}</div>
+                ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
+                ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
+                ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
+                <div class="inv-actions">
+                    ${action}
+                    ${secondary}
+                    ${item.is_equipped ? '<span class="inv-meta">надето</span>' : ''}
+                </div>
+            </div>
+        `;
+    }
+
     function renderInventory() {
         const grid = el('inventory-grid');
-        const items = filteredInventory();
-        const total = currentInventory().length;
+        const items = filteredInventory().filter((item) => item.item_type !== 'ARTIFACT');
+        const occupied = currentInventory().filter((item) => item.item_type !== 'ARTIFACT').length;
+        const channel = currentChannel();
+        const limit = inventoryLimitForLevel(channel && channel.player ? channel.player.level : 1);
 
-        el('inventory-counter').textContent = `${items.length} из ${total}`;
+        el('inventory-counter').textContent = `занято ${occupied} из ${limit}`;
 
         if (items.length === 0) {
-            const channel = currentChannel();
             const message = channel && channel.loadError
                 ? 'Не удалось загрузить инвентарь канала'
-                : (total === 0 ? 'На этом канале инвентарь пуст' : 'По фильтрам ничего не найдено');
+                : (occupied === 0 ? 'На этом канале инвентарь пуст' : 'По фильтрам ничего не найдено');
             grid.innerHTML = `<div class="empty-state">${message}</div>`;
             return;
         }
 
-        grid.innerHTML = items.map((item) => {
-            const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
-            const rarity = RARITY[item.rarity] || RARITY.empty;
-            const id = String(item.id);
+        grid.innerHTML = items.map(renderItemCard).join('');
+    }
 
-            const action = meta.equippable
-                ? (item.is_equipped
-                    ? `<button class="btn-admin" data-action="unequip" data-id="${esc(id)}">Снять</button>`
-                    : `<button class="btn-admin primary" data-action="equip" data-id="${esc(id)}">Экипировать</button>`)
-                : '';
+    function renderArtifacts() {
+        const grid = el('artifacts-grid');
+        if (!grid) return;
+        const items = currentInventory().filter((item) => item.item_type === 'ARTIFACT');
+        const counter = el('artifacts-counter');
+        if (counter) counter.textContent = `${items.length} артефактов`;
 
-            const sellButton = '<button class="btn-admin" disabled title="Появится вместе с логикой продажи">Продать</button>';
-            const secondary = item.item_type === 'CONSUMABLE'
-                ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
-                : sellButton;
+        if (items.length === 0) {
+            grid.innerHTML = '<div class="empty-state">Артефактов нет</div>';
+            return;
+        }
 
-            return `
-                <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="border-left-color:${rarity.color}">
-                    <div class="inv-head">
-                        <div class="inv-icon">${rarity.icon}</div>
-                        <div class="inv-title">
-                            <div class="inv-name">${esc(item.name)}</div>
-                            <div class="inv-rarity" style="color:${rarity.color}">${esc(item.rarity)} · ${meta.label}</div>
-                        </div>
-                        ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
-                    </div>
-                    <div class="inv-meta">${esc(item.meta || '')}</div>
-                    ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
-                    ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-meta">${esc('✨ ' + formatArtifactEffects(item.effects))}</div>` : ''}
-                    ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
-                    <div class="inv-actions">
-                        ${action}
-                        ${secondary}
-                        ${item.is_equipped ? '<span class="inv-meta">надето</span>' : ''}
-                    </div>
-                </div>
-            `;
-        }).join('');
+        grid.innerHTML = items.map(renderItemCard).join('');
     }
 
     function renderRankings() {
@@ -654,6 +686,7 @@
         renderChip();
         renderProfile();
         renderInventory();
+        renderArtifacts();
         renderLoadout();
         renderRankings();
     }
@@ -759,6 +792,7 @@
         renderChip();
         renderProfile();
         renderInventory();
+        renderArtifacts();
         renderLoadout();
         renderRankings();
         toast('Вы вышли из аккаунта');
@@ -822,6 +856,15 @@
             if (!button || button.disabled) return;
             changeEquipment(button.dataset.action, button.dataset.id);
         });
+
+        const loadoutGrid = el('loadout-grid');
+        if (loadoutGrid) {
+            loadoutGrid.addEventListener('click', (event) => {
+                const button = event.target.closest('[data-action]');
+                if (!button || button.disabled) return;
+                changeEquipment(button.dataset.action, button.dataset.id);
+            });
+        }
 
         if (!SUPABASE_READY) el('setup-notice').hidden = false;
     }

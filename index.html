@@ -24,6 +24,7 @@
         <ul class="nav-links">
             <li><button onclick="showTab('profile')" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
             <li><button onclick="showTab('inventory')" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
+            <li><button onclick="showTab('artifacts')" id="btn-artifacts"><span class="nav-icon">🔮</span><span>Артефакты</span></button></li>
             <li><button onclick="showTab('loadout')" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
         </ul>
 
@@ -161,20 +162,18 @@
             <div id="inventory-grid" class="inventory-grid"></div>
         </section>
 
+        <!-- АРТЕФАКТЫ -->
+        <section id="artifacts" class="tab-content">
+            <div class="filters-row">
+                <span class="inventory-counter" id="artifacts-counter">0 артефактов</span>
+            </div>
+            <div id="artifacts-grid" class="inventory-grid"></div>
+        </section>
+
         <!-- ЭКИПИРОВКА -->
         <section id="loadout" class="tab-content">
             <div class="slot-grid" id="slot-grid"></div>
-
-            <div class="dashboard-panel animate-up">
-                <div class="panel-header">
-                    <div class="panel-title"><span class="panel-icon">🛠️</span> Как это работает</div>
-                </div>
-                <p class="admin-hint">
-                    Надеть можно по одному предмету каждого типа: удочка, леска, крючок, наживка.
-                    Действия меняют флаг <code>is_equipped</code> у строки инвентаря в Supabase и сразу
-                    учитываются ботом в следующей рыбалке.
-                </p>
-            </div>
+            <div id="loadout-grid" class="inventory-grid"></div>
         </section>
 
         <!-- РЕЙТИНГ -->
