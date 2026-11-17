@@ -80,7 +80,7 @@
                 { item_id: 'hook_legendary_1', item_type: 'HOOK', name: 'Крючок Посейдона', rarity: 'legendary', quantity: 1, is_equipped: false, meta: 'Прочность 74 / 100' },
                 { item_id: 'bait_common_1', item_type: 'BAIT', name: 'Червь', rarity: 'common', quantity: 24, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'bait_rare_1', item_type: 'BAIT', name: 'Светящаяся приманка', rarity: 'rare', quantity: 5, is_equipped: false, meta: 'Повышает шанс редкой рыбы' },
-                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }] },
+                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }], cursed: false },
                 { item_id: 'fish_mythic_1', item_type: 'FISH', name: 'Лунный карп', rarity: 'mythic', quantity: 1, is_equipped: false, meta: 'Цена продажи: 4200 💰' },
                 { item_id: 'fish_trash_1', item_type: 'FISH', name: 'Старый сапог', rarity: 'trash', quantity: 3, is_equipped: false, meta: 'Цена продажи: 3 💰' },
                 { item_id: 'fish_treasure_1', item_type: 'FISH', name: 'Затонувший сундук', rarity: 'treasure', quantity: 1, is_equipped: false, meta: 'Цена продажи: 900 💰' },
@@ -224,7 +224,6 @@
         if (meta.weight != null && Number.isFinite(Number(meta.weight))) {
             parts.push(`Вес ${Number(meta.weight).toFixed(2)} кг`);
         }
-        if (meta.cursed) parts.push('проклят');
         if (row.expires_at) parts.push(`до ${formatDateTime(row.expires_at)}`);
 
         if (!parts.length) {
@@ -249,7 +248,8 @@
             is_equipped: Boolean(row.is_equipped),
             meta: inventoryMetaText(row, item),
             description: (row.meta && typeof row.meta === 'object' && row.meta.description) ? String(row.meta.description) : '',
-            effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : []
+            effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : [],
+            cursed: (row.meta && typeof row.meta === 'object') ? Boolean(row.meta.cursed) : false
         };
     }
 
@@ -618,6 +618,7 @@
                     <div class="inv-meta">${esc(item.meta || '')}</div>
                     ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
                     ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-meta">${esc('✨ ' + formatArtifactEffects(item.effects))}</div>` : ''}
+                    ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
                     <div class="inv-actions">
                         ${action}
                         ${secondary}
