@@ -436,7 +436,7 @@
                 .order('item_type')
                 .order('id'),
             client.from('catches')
-                .select('item_id,price,caught_at,items(name,rarity)')
+                .select('item_id,price,caught_at,items(name,rarity,description)')
                 .eq('channel_id', channelId)
                 .eq('user_id', state.userId)
                 .order('caught_at', { ascending: false })
@@ -486,6 +486,7 @@
             return {
                 name: item.name || row.item_id,
                 rarity: item.rarity || 'common',
+                description: item.description ? String(item.description) : '',
                 price: Number(row.price) || 0,
                 at: relativeTime(row.caught_at)
             };
@@ -629,6 +630,7 @@
                 <div class="admin-event-row">
                     <div class="grow">
                         <div class="item-name">🐟 ${esc(catchItem.name)}</div>
+                        ${catchItem.description ? `<div class="item-meta">${esc(catchItem.description)}</div>` : ''}
                         <div class="item-meta">${esc(catchItem.at)}</div>
                     </div>
                     <div class="item-details" style="color:${rarity.color}">${Number(catchItem.price) || 0} 💰</div>
@@ -752,7 +754,7 @@
                         ${typeRows}
                     </div>
                     <div class="chances-group">
-                        <div class="chances-group-title">Редкость, если клюнула рыба</div>
+                        <div class="chances-group-title">Редкость рыб и сокровищ</div>
                         ${rarityRows}
                     </div>
                 </div>
