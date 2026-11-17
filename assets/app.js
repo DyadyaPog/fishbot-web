@@ -80,7 +80,7 @@
                 { item_id: 'hook_legendary_1', item_type: 'HOOK', name: 'Крючок Посейдона', rarity: 'legendary', quantity: 1, is_equipped: false, meta: 'Прочность 74 / 100' },
                 { item_id: 'bait_common_1', item_type: 'BAIT', name: 'Червь', rarity: 'common', quantity: 24, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'bait_rare_1', item_type: 'BAIT', name: 'Светящаяся приманка', rarity: 'rare', quantity: 5, is_equipped: false, meta: 'Повышает шанс редкой рыбы' },
-                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят' },
+                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }] },
                 { item_id: 'fish_mythic_1', item_type: 'FISH', name: 'Лунный карп', rarity: 'mythic', quantity: 1, is_equipped: false, meta: 'Цена продажи: 4200 💰' },
                 { item_id: 'fish_trash_1', item_type: 'FISH', name: 'Старый сапог', rarity: 'trash', quantity: 3, is_equipped: false, meta: 'Цена продажи: 3 💰' },
                 { item_id: 'fish_treasure_1', item_type: 'FISH', name: 'Затонувший сундук', rarity: 'treasure', quantity: 1, is_equipped: false, meta: 'Цена продажи: 900 💰' },
@@ -225,7 +225,6 @@
             parts.push(`Вес ${Number(meta.weight).toFixed(2)} кг`);
         }
         if (meta.cursed) parts.push('проклят');
-        if (Array.isArray(meta.effects) && meta.effects.length) parts.push(`эффектов: ${meta.effects.length}`);
         if (row.expires_at) parts.push(`до ${formatDateTime(row.expires_at)}`);
 
         if (!parts.length) {
@@ -248,7 +247,9 @@
             price: Number(item.price) || 0,
             quantity: Number(row.quantity) || 1,
             is_equipped: Boolean(row.is_equipped),
-            meta: inventoryMetaText(row, item)
+            meta: inventoryMetaText(row, item),
+            description: (row.meta && typeof row.meta === 'object' && row.meta.description) ? String(row.meta.description) : '',
+            effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : []
         };
     }
 
@@ -534,6 +535,44 @@
         });
     }
 
+    function formatArtifactEffect(effect) {
+        const value = Number(effect && effect.value);
+        const percent = (v) => `${Math.round(Number(v) * 100)}%`;
+        switch (effect && effect.type) {
+            case 'type_modifier': {
+                const emoji = { fish: ' Joel ', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
+                return `${emoji}×${percent(value)}`;
+            }
+            case 'rarity_modifier': {
+                const rarity = RARITY[effect.target];
+                return `${rarity ? rarity.icon : ''}×${percent(value)}`;
+            }
+            case 'rarity_bonus': {
+                const rarity = RARITY[effect.target];
+                return `${rarity ? rarity.icon : ''}${value >= 0 ? '+' : ''}${value} к весу`;
+            }
+            case 'gold_bonus':
+                return `${value >= 0 ? '+' : ''}${value}💰/заброс`;
+            case 'xp_multiplier':
+                return `XP ×${percent(value)}`;
+            case 'cooldown_modifier':
+                return `кулдаун ×${percent(value)}`;
+            case 'bait_save_chance':
+                return `наживка цела: ${percent(value)}`;
+            case 'double_catch_chance':
+                return `двойной улов: ${percent(value)}`;
+            case 'inventory_bonus':
+                return `${value >= 0 ? '+' : ''}${value} слота`;
+            default:
+                return String(effect && effect.type || '');
+        }
+    }
+
+    function formatArtifactEffects(effects) {
+        if (!Array.isArray(effects) || effects.length === 0) return 'без эффектов';
+        return effects.map(formatArtifactEffect).join(', ');
+    }
+
     function renderInventory() {
         const grid = el('inventory-grid');
         const items = filteredInventory();
@@ -561,11 +600,10 @@
                     : `<button class="btn-admin primary" data-action="equip" data-id="${esc(id)}">Экипировать</button>`)
                 : '';
 
+            const sellButton = '<button class="btn-admin" disabled title="Появится вместе с логикой продажи">Продать</button>';
             const secondary = item.item_type === 'CONSUMABLE'
-                ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>'
-                : (item.item_type === 'FISH'
-                    ? '<button class="btn-admin" disabled title="Появится вместе с логикой продажи">Продать</button>'
-                    : '');
+                ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
+                : sellButton;
 
             return `
                 <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="border-left-color:${rarity.color}">
@@ -578,6 +616,8 @@
                         ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
                     </div>
                     <div class="inv-meta">${esc(item.meta || '')}</div>
+                    ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
+                    ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-meta">${esc('✨ ' + formatArtifactEffects(item.effects))}</div>` : ''}
                     <div class="inv-actions">
                         ${action}
                         ${secondary}
