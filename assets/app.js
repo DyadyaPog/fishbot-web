@@ -624,6 +624,7 @@
         document.querySelectorAll('.tab-content').forEach((section) => section.classList.remove('active'));
         const target = el(name);
         if (target) target.classList.add('active');
+        if (name === 'profile') scheduleCatchesMinHeight();
 
         document.querySelectorAll('.nav-links button').forEach((button) => button.classList.remove('active'));
         const navButton = el(`btn-${name}`);
@@ -707,6 +708,44 @@
             : (state.session ? 'Обновить' : 'Демо-режим');
     }
 
+    let catchHeightFrame = 0;
+
+    function scheduleCatchesMinHeight() {
+        cancelAnimationFrame(catchHeightFrame);
+        catchHeightFrame = requestAnimationFrame(updateCatchesMinHeight);
+    }
+
+    /* Высота «Последних уловов» — ровно MAX_CATCHES реальных строк.
+       Если строк меньше, берём самую высокую: текст в ней уже перенёсся. */
+    function updateCatchesMinHeight() {
+        const container = el('recent-catches');
+        if (!container) return;
+
+        const rows = Array.from(container.querySelectorAll('.admin-event-row'));
+        if (!rows.length) {
+            container.style.minHeight = '';
+            return;
+        }
+
+        const heights = rows.map((row) => {
+            const style = getComputedStyle(row);
+            return row.getBoundingClientRect().height
+                + (parseFloat(style.marginTop) || 0)
+                + (parseFloat(style.marginBottom) || 0);
+        }).filter((height) => height > 0);
+        if (!heights.length) return;
+
+        const rowsHeight = heights.length >= MAX_CATCHES
+            ? heights.slice(0, MAX_CATCHES).reduce((sum, height) => sum + height, 0)
+            : Math.max(...heights) * MAX_CATCHES;
+
+        const style = getComputedStyle(container);
+        const padding = (parseFloat(style.paddingTop) || 0) + (parseFloat(style.paddingBottom) || 0);
+        const gap = parseFloat(style.rowGap) || 0;
+
+        container.style.minHeight = `${Math.ceil(rowsHeight + padding + gap * (MAX_CATCHES - 1))}px`;
+    }
+
     function renderProfile() {
         const channel = currentChannel();
         if (!channel) return;
@@ -745,6 +784,8 @@
             `;
             }).join('');
         }
+
+        scheduleCatchesMinHeight();
     }
 
     function renderLoadout() {
@@ -1387,6 +1428,11 @@
         document.addEventListener('visibilitychange', () => {
             if (document.visibilityState === 'visible') refreshSellPrices();
         });
+
+        window.addEventListener('resize', scheduleCatchesMinHeight);
+        if (document.fonts && document.fonts.ready) {
+            document.fonts.ready.then(scheduleCatchesMinHeight);
+        }
 
         if (!SUPABASE_READY) el('setup-notice').hidden = false;
     }

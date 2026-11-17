@@ -305,8 +305,6 @@ body {
     --profile-padding: 1.25rem;
     --profile-padding-sm: 1rem;
     --profile-fishing-min-height: 110px;
-    --profile-catch-rows: 10;
-    --profile-catch-row-height: 56px;
     --profile-catch-padding: 1rem;
 
     grid-template-columns: minmax(var(--profile-column-min), 1fr) minmax(0, 2fr);
@@ -453,7 +451,6 @@ body {
     flex: 1;
     overflow-y: auto;
     padding: var(--profile-catch-padding);
-    min-height: calc(var(--profile-catch-rows) * var(--profile-catch-row-height) + 2 * var(--profile-catch-padding));
 }
 .catch-card {
     background: rgba(255, 255, 255, 0.03);
