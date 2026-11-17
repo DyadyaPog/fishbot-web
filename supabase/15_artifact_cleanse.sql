@@ -42,7 +42,7 @@ grant select, insert, update on artifact_catalog to service_role;
 
 -- ---------------------------------------------------------------------------
 -- Ролл одного эффекта: диапазон min..max → конкретное значение.
--- Повторяет rollEffectValue из artifactEffects.js, включая округление.
+-- Округление совпадает с прежним роллом в боте.
 -- ---------------------------------------------------------------------------
 
 create or replace function artifact_roll_effect(p_effect jsonb)
