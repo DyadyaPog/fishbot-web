@@ -444,6 +444,8 @@
             return;
         }
 
+        channel.pricesFetchedAt = Date.now();
+
         const rows = new Map((data || []).map((row) => [String(row.inventory_id), row]));
         channel.inventory.forEach((item) => {
             const row = rows.get(item.id);
@@ -494,7 +496,7 @@
             toast('Не удалось загрузить справочник предметов');
         }
 
-        const [inventory, catches, ranking] = await Promise.all([
+        const [inventory, catches, ranking, chances] = await Promise.all([
             /* Справочник items подгружается отдельно и кэшируется локально,
                поэтому здесь только данные игрока — без join и без дублирования
                метаданных. */
@@ -514,7 +516,14 @@
                 .select('username,balance,level,place')
                 .eq('channel_id', channelId)
                 .order('place', { ascending: true })
-                .limit(MAX_RANKING)
+                .limit(MAX_RANKING),
+            /* Шансы — снимок расчёта бота. Таблица может быть ещё не создана
+               или строки ещё нет: это не повод ломать загрузку канала. */
+            client.from('player_chances')
+                .select('types,rarities_if_fish,updated_at')
+                .eq('channel_id', channelId)
+                .eq('user_id', state.userId)
+                .maybeSingle()
         ]);
 
         const error = inventory.error || catches.error || ranking.error;
@@ -532,14 +541,6 @@
         channel.loadError = null;
         channel.inventory = (inventory.data || []).map(mapInventoryRow);
 
-        /* Шансы — снимок расчёта бота. Таблица может быть ещё не создана
-           или строки ещё нет: это не повод ломать загрузку канала. */
-        const chances = await client
-            .from('player_chances')
-            .select('types,rarities_if_fish,updated_at')
-            .eq('channel_id', channelId)
-            .eq('user_id', state.userId)
-            .maybeSingle();
         if (chances.error) {
             console.warn('player_chances:', chances.error.message);
             channel.chances = null;
@@ -590,9 +591,15 @@
 
     /* Обновляет цены без полной перезагрузки канала: окно полного возврата
        (5 минут) может закончиться, пока страница открыта. */
-    async function refreshSellPrices() {
+    async function refreshSellPrices(force) {
         const channel = currentChannel();
         if (!channel || state.demo || !channel.inventory.length) return;
+
+        /* Не дёргаем RPC на каждое переключение вкладки/фокус: цены уже
+           пришли с loadChannel, а окно возврата само разбудит таймер. */
+        const last = Number(channel.pricesFetchedAt) || 0;
+        const hasRefund = channel.inventory.some((item) => item.refund_ends_at);
+        if (!force && !hasRefund && Date.now() - last < 30000) return;
 
         await attachSellPrices(channel, channel.id);
         renderInventory();
@@ -1111,6 +1118,28 @@
         renderLoadout();
     }
 
+    /* После продажи меняются только инвентарь и баланс: не тянем уловы,
+       рейтинг и шансы повторно. */
+    async function reloadInventory(channelId) {
+        const channel = state.channels.find((entry) => entry.id === String(channelId));
+        if (!channel || !SUPABASE_READY || !state.userId) return;
+
+        const { data, error } = await client
+            .from('inventory')
+            .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at')
+            .eq('channel_id', channelId)
+            .eq('user_id', state.userId)
+            .order('item_type')
+            .order('id');
+        if (error) {
+            console.warn('inventory:', error.message);
+            return;
+        }
+
+        channel.inventory = (data || []).map(mapInventoryRow);
+        await attachSellPrices(channel, channelId);
+    }
+
     /* Продажа: владельца строки и цену проверяет и считает только база (RPC sell_item). */
     async function sellItem(rawId) {
         const channel = currentChannel();
@@ -1128,6 +1157,9 @@
             return;
         }
 
+        const priceLabel = item.sell_price != null ? ` за ${formatMoney(item.sell_price)}` : '';
+        if (!window.confirm(`Продать «${item.name}»${priceLabel}?`)) return;
+
         if (state.demo) {
             toast(`Демо-режим: ${item.name} не продаётся`);
             return;
@@ -1143,7 +1175,7 @@
 
         if (data && data.balance != null) channel.player.balance = Number(data.balance) || 0;
 
-        await loadChannel(channel.id);
+        await reloadInventory(channel.id);
         renderProfile();
         renderInventory();
         renderArtifacts();
