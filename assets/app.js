@@ -469,8 +469,10 @@
         if (chances.error) {
             console.warn('player_chances:', chances.error.message);
             channel.chances = null;
+            channel.chancesUpdatedAt = null;
         } else {
             channel.chances = chances.data || null;
+            channel.chancesUpdatedAt = chances.data ? chances.data.updated_at : null;
         }
 
         await attachSellPrices(channel, channelId);
@@ -682,7 +684,7 @@
             <div class="chance-row">
                 <span class="chance-name"><span class="chance-icon">${icon}</span>${esc(label)}</span>
                 <span class="chance-bar"><span class="chance-fill" style="width:${width.toFixed(2)}%;background:${color}"></span></span>
-                <span class="chance-value">${percent.toFixed(1)}%</span>
+                <span class="chance-value">${percent.toFixed(2)}%</span>
             </div>
         `;
     }
@@ -696,10 +698,15 @@
         const types = chances && chances.types;
         const rarities = chances && chances.rarities_if_fish;
 
+        const canRefresh = SUPABASE_READY && !state.demo && channel;
+        const refreshButton = canRefresh
+            ? `<button class="chances-refresh" data-action="refresh-chances" data-channel="${esc(channel.id)}" title="Попросить бота пересчитать шансы">↻ Обновить</button>`
+            : '';
         const header = (caption) => `
             <div class="panel-header">
                 <div class="panel-title"><span class="panel-icon">🎯</span> Шансы улова</div>
                 <span class="chances-caption">${esc(caption)}</span>
+                ${refreshButton}
             </div>
         `;
 
@@ -746,6 +753,42 @@
                 </div>
             </div>
         `;
+    }
+
+    async function requestChancesRefresh(channelId) {
+        if (!SUPABASE_READY || !client || state.demo || !channelId) return;
+        const button = document.querySelector('[data-action="refresh-chances"]');
+        if (button) button.disabled = true;
+        try {
+            const { error } = await client.rpc('request_chances_refresh', { p_channel_id: Number(channelId) });
+            if (error) throw error;
+            toast('Запрос отправлен. Бот пересчитает шансы в течение нескольких секунд.');
+            const channel = currentChannel();
+            const previous = channel ? channel.chancesUpdatedAt : null;
+            // Опрашиваем player_chances до изменения updated_at (макс ~30 с).
+            const started = Date.now();
+            const timer = setInterval(async () => {
+                if (Date.now() - started > 30000) { clearInterval(timer); if (button) button.disabled = false; return; }
+                if (!state.channelId) { clearInterval(timer); if (button) button.disabled = false; return; }
+                const { data } = await client
+                    .from('player_chances')
+                    .select('types,rarities_if_fish,updated_at')
+                    .eq('channel_id', state.channelId)
+                    .eq('user_id', state.userId)
+                    .maybeSingle();
+                if (data && data.updated_at && data.updated_at !== previous) {
+                    clearInterval(timer);
+                    const ch = currentChannel();
+                    if (ch) { ch.chances = data; ch.chancesUpdatedAt = data.updated_at; }
+                    renderChances();
+                    toast('Шансы обновлены.');
+                    if (button) button.disabled = false;
+                }
+            }, 2000);
+        } catch (error) {
+            toast(`Не удалось запросить пересчёт: ${shortError(error)}`);
+            if (button) button.disabled = false;
+        }
     }
 
     function filteredInventory() {
@@ -1149,6 +1192,12 @@
             const button = event.target.closest('[data-action="sell"]');
             if (!button || button.disabled) return;
             sellItem(button.dataset.id);
+        });
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="refresh-chances"]');
+            if (!button || button.disabled) return;
+            requestChancesRefresh(button.dataset.channel);
         });
 
         document.addEventListener('visibilitychange', () => {
