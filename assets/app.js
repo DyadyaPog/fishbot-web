@@ -53,6 +53,16 @@
         empty: { icon: '💨', color: 'var(--rarity-empty)' }
     };
 
+    /* Типы артефактов совпадают с ARTIFACT_TYPE_DETAILS бота. */
+    const ARTIFACT_TYPES = {
+        catch: { label: 'Улов', emoji: '🎣' },
+        treasure: { label: 'Клад', emoji: '🪎' },
+        luck: { label: 'Удача', emoji: '🍀' },
+        gold: { label: 'Доход', emoji: '💰' },
+        comfort: { label: 'Удобство', emoji: '🧰' },
+        mystic: { label: 'Мистика', emoji: '🌀' }
+    };
+
     const ITEM_TYPES = {
         ROD: { label: 'Удочка', icon: '🎣', equippable: true },
         LINE: { label: 'Леска', icon: '🧵', equippable: true },
@@ -86,7 +96,7 @@
                 { item_id: 'hook_legendary_1', item_type: 'HOOK', name: 'Крючок Посейдона', rarity: 'legendary', quantity: 1, is_equipped: false, meta: 'Прочность 74 / 100' },
                 { item_id: 'bait_common_1', item_type: 'BAIT', name: 'Червь', rarity: 'common', quantity: 24, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'bait_rare_1', item_type: 'BAIT', name: 'Светящаяся приманка', rarity: 'rare', quantity: 5, is_equipped: false, meta: 'Повышает шанс редкой рыбы' },
-                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }], cursed: false },
+                { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', artifactType: 'luck', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }], cursed: false },
                 { item_id: 'fish_mythic_1', item_type: 'FISH', name: 'Лунный карп', rarity: 'mythic', quantity: 1, is_equipped: false, meta: 'Цена продажи: 4200 💰' },
                 { item_id: 'fish_trash_1', item_type: 'FISH', name: 'Старый сапог', rarity: 'trash', quantity: 3, is_equipped: false, meta: 'Цена продажи: 3 💰' },
                 { item_id: 'fish_treasure_1', item_type: 'FISH', name: 'Затонувший сундук', rarity: 'treasure', quantity: 1, is_equipped: false, meta: 'Цена продажи: 900 💰' },
@@ -222,8 +232,10 @@
     }
 
     /* В meta лежит только то, что меняется у экземпляра (прочность, вес, эффекты). */
-    function inventoryMetaText(row, item) {
+    /* Только постоянные характеристики. Цену подставляет база (sell_price). */
+    function inventoryMetaText(row) {
         const meta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+        const type = uiType(row.item_type);
         const parts = [];
 
         if (meta.uses != null && meta.max_uses != null) parts.push(`Прочность: ${meta.uses}/${meta.max_uses}`);
@@ -232,43 +244,28 @@
             parts.push(`Вес: ${Number(meta.weight).toFixed(2)} кг`);
         }
         if (row.expires_at) parts.push(`Истекает: ${formatDateTime(row.expires_at)}`);
-        if (uiType(row.item_type) === 'FISH' && item.price != null) parts.push(`Цена: ${formatMoney(item.price)}`);
-
-        const type = uiType(row.item_type);
-        if (ITEM_TYPES[type] && ITEM_TYPES[type].equippable && item.price != null) {
-            const maxUses = Number(meta.max_uses);
-            const uses = (meta.uses != null) ? Number(meta.uses) : maxUses;
-            let sellPrice = item.price;
-            if (Number.isFinite(maxUses) && maxUses > 0 && Number.isFinite(uses) && uses !== -1) {
-                sellPrice = Math.round(item.price * 0.5 * (uses / maxUses));
-            } else {
-                sellPrice = Math.round(item.price * 0.5);
-            }
-            parts.push(`Цена: ${formatMoney(sellPrice)}`);
-        }
-
-        if (!parts.length) {
-            const type = uiType(row.item_type);
-            if (ITEM_TYPES[type] && ITEM_TYPES[type].equippable) parts.push('Снаряжение');
-            else if (item.price != null) parts.push(`Цена: ${formatMoney(item.price)}`);
-        }
+        if (!parts.length && ITEM_TYPES[type] && ITEM_TYPES[type].equippable) parts.push('Снаряжение');
 
         return parts.join(' · ');
     }
 
     function mapInventoryRow(row) {
         const item = row.items && typeof row.items === 'object' ? row.items : {};
+        const rawMeta = row.meta && typeof row.meta === 'object' ? row.meta : {};
         return {
             id: String(row.id),
             item_id: row.item_id,
             item_type: uiType(row.item_type),
             name: item.name || row.item_id,
             rarity: item.rarity || 'common',
-            price: Number(item.price) || 0,
+            /* Цену продажи ставит attachSellPrices() из RPC, а не браузер. */
+            sell_price: null,
             quantity: Number(row.quantity) || 1,
             is_equipped: Boolean(row.is_equipped),
-            meta: inventoryMetaText(row, item),
+            meta: inventoryMetaText(row),
             description: (row.meta && typeof row.meta === 'object' && row.meta.description) ? String(row.meta.description) : '',
+            /* Тип артефакта из meta (catch/treasure/luck/gold/comfort/mystic). */
+            artifactType: rawMeta.type ? String(rawMeta.type) : null,
             effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : [],
             cursed: (row.meta && typeof row.meta === 'object') ? Boolean(row.meta.cursed) : false
         };
@@ -336,6 +333,59 @@
         }
     }
 
+    let refundTimer = null;
+
+    /* Цены продажи приходят из базы: те же числа, что начислит sell_item. */
+    async function attachSellPrices(channel, channelId) {
+        if (!client || !Number.isFinite(Number(channelId))) return;
+
+        const { data, error } = await client.rpc('inventory_sell_prices', {
+            p_channel_id: Number(channelId)
+        });
+        if (error) {
+            console.warn('inventory_sell_prices:', error.message);
+            return;
+        }
+
+        const rows = new Map((data || []).map((row) => [String(row.inventory_id), row]));
+        channel.inventory.forEach((item) => {
+            const row = rows.get(item.id);
+            const price = row ? Number(row.sell_price) : NaN;
+            item.sell_price = Number.isFinite(price) ? price : null;
+
+            /* Задержку до конца окна возврата считаем по времени базы, чтобы
+               сдвинутые часы браузера не пересчитали цену раньше времени. */
+            const endsAt = row && row.refund_ends_at ? new Date(row.refund_ends_at).getTime() : NaN;
+            const serverNow = row && row.server_now ? new Date(row.server_now).getTime() : Date.now();
+            const remaining = endsAt - serverNow;
+            item.refund_ends_at = Number.isFinite(remaining) && remaining > 0 ? Date.now() + remaining : null;
+        });
+
+        scheduleRefundRefresh(channel);
+    }
+
+    /* Окно полного возврата (5 минут) кончается само по себе. Будим кабинет
+       ровно в этот момент, чтобы подпись не разошлась с выплатой. */
+    function scheduleRefundRefresh(channel) {
+        if (refundTimer) {
+            clearTimeout(refundTimer);
+            refundTimer = null;
+        }
+        if (!channel) return;
+
+        let next = Infinity;
+        channel.inventory.forEach((item) => {
+            if (!item.refund_ends_at) return;
+            if (item.refund_ends_at > Date.now() && item.refund_ends_at < next) {
+                next = item.refund_ends_at;
+            }
+        });
+        if (next === Infinity) return;
+
+        const delay = Math.max(500, next - Date.now() + 500);
+        refundTimer = setTimeout(refreshSellPrices, delay);
+    }
+
     /* Детали одного канала: инвентарь, последние уловы, рейтинг. */
     async function loadChannel(channelId) {
         const channel = state.channels.find((entry) => entry.id === String(channelId));
@@ -375,6 +425,7 @@
 
         channel.loadError = null;
         channel.inventory = (inventory.data || []).map(mapInventoryRow);
+        await attachSellPrices(channel, channelId);
         channel.catches = (catches.data || []).map((row) => {
             const item = row.items && typeof row.items === 'object' ? row.items : {};
             return {
@@ -390,6 +441,18 @@
             value: formatMoney(row.balance),
             level: Number(row.level) || 1
         }));
+    }
+
+    /* Обновляет цены без полной перезагрузки канала: окно полного возврата
+       (5 минут) может закончиться, пока страница открыта. */
+    async function refreshSellPrices() {
+        const channel = currentChannel();
+        if (!channel || state.demo || !channel.inventory.length) return;
+
+        await attachSellPrices(channel, channel.id);
+        renderInventory();
+        renderArtifacts();
+        renderLoadout();
     }
 
     function showTab(name) {
@@ -410,6 +473,10 @@
 
         const title = el('page-title');
         if (title) title.textContent = TITLES[name] || 'Кабинет';
+
+        if (name === 'inventory' || name === 'artifacts' || name === 'loadout') {
+            refreshSellPrices();
+        }
     }
 
     function renderAuthOnly() {
@@ -611,10 +678,25 @@
                 : `<button class="btn-admin primary" data-action="equip" data-id="${esc(id)}">Экипировать</button>`)
             : '';
 
-        const sellButton = '<button class="btn-admin" disabled title="Появится вместе с логикой продажи">Продать</button>';
+        const sellTitle = item.is_equipped
+            ? 'Сначала снимите предмет'
+            : (item.cursed ? 'Проклятый артефакт продать нельзя' : 'Продать предмет');
+        const sellButton = `<button class="btn-admin" data-action="sell" data-id="${esc(id)}"${item.is_equipped || item.cursed ? ' disabled' : ''} title="${sellTitle}">Продать</button>`;
         const secondary = item.item_type === 'CONSUMABLE'
             ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
             : sellButton;
+
+        /* Цена — из RPC inventory_sell_prices, то есть ровно та, что выплатит sell_item. */
+        const hasSellPrice = item.sell_price != null && Number.isFinite(Number(item.sell_price));
+        const priceLabel = item.item_type === 'FISH' ? 'Цена' : 'Цена продажи';
+        const priceBlock = hasSellPrice
+            ? `<div class="inv-info-block">${esc(`${priceLabel}: ${formatMoney(item.sell_price)}`)}</div>`
+            : '';
+
+        const artifactDetails = item.item_type === 'ARTIFACT' ? ARTIFACT_TYPES[item.artifactType] : null;
+        const artifactTypeBlock = item.item_type === 'ARTIFACT' && item.artifactType
+            ? `<div class="inv-info-block">${esc(`Тип: ${artifactDetails ? `${artifactDetails.emoji} ${artifactDetails.label}` : item.artifactType}`)}</div>`
+            : '';
 
                     return `
                 <div class="inv-item${item.is_equipped ? ' equipped' : ''}" style="--rarity-color:${rarity.color}; border-left-color:${rarity.color}">
@@ -629,7 +711,9 @@
                 ${(item.item_type === 'FISH' || (ITEM_TYPES[item.item_type] && ITEM_TYPES[item.item_type].equippable)) && item.meta
                     ? item.meta.split(' · ').filter(Boolean).map((part) => `<div class="inv-info-block">${esc(part)}</div>`).join('')
                     : `<div class="inv-meta">${esc(item.meta || '')}</div>`}
+                ${priceBlock}
                 ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
+                ${artifactTypeBlock}
                 ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
                 ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
                 <div class="inv-actions">
@@ -746,6 +830,46 @@
 
         renderInventory();
         renderLoadout();
+    }
+
+    /* Продажа: владельца строки и цену проверяет и считает только база (RPC sell_item). */
+    async function sellItem(rawId) {
+        const channel = currentChannel();
+        if (!channel) return;
+
+        const item = channel.inventory.find((entry) => String(entry.id) === String(rawId));
+        if (!item) return;
+
+        if (item.is_equipped) {
+            toast('Сначала снимите предмет');
+            return;
+        }
+        if (item.cursed) {
+            toast('Проклятый артефакт продать нельзя');
+            return;
+        }
+
+        if (state.demo) {
+            toast(`Демо-режим: ${item.name} не продаётся`);
+            return;
+        }
+        if (!client) return;
+
+        const { data, error } = await client.rpc('sell_item', { p_inventory_id: Number(item.id) });
+        if (error) {
+            console.error(error);
+            toast(`Не удалось продать: ${shortError(error)}`);
+            return;
+        }
+
+        if (data && data.balance != null) channel.player.balance = Number(data.balance) || 0;
+
+        await loadChannel(channel.id);
+        renderProfile();
+        renderInventory();
+        renderArtifacts();
+        renderLoadout();
+        toast(`Продано: ${item.name} (+${formatMoney(data && data.gold)})`);
     }
 
     function startDemo() {
@@ -870,7 +994,7 @@
 
     function bind() {
         el('inventory-grid').addEventListener('click', (event) => {
-            const button = event.target.closest('[data-action]');
+            const button = event.target.closest('[data-action="equip"], [data-action="unequip"]');
             if (!button || button.disabled) return;
             changeEquipment(button.dataset.action, button.dataset.id);
         });
@@ -878,11 +1002,21 @@
         const loadoutGrid = el('loadout-grid');
         if (loadoutGrid) {
             loadoutGrid.addEventListener('click', (event) => {
-                const button = event.target.closest('[data-action]');
+                const button = event.target.closest('[data-action="equip"], [data-action="unequip"]');
                 if (!button || button.disabled) return;
                 changeEquipment(button.dataset.action, button.dataset.id);
             });
         }
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="sell"]');
+            if (!button || button.disabled) return;
+            sellItem(button.dataset.id);
+        });
+
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') refreshSellPrices();
+        });
 
         if (!SUPABASE_READY) el('setup-notice').hidden = false;
     }

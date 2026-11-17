@@ -18,14 +18,14 @@ alter table accounts  enable row level security;
 alter table players   enable row level security;
 alter table inventory enable row level security;
 alter table catches   enable row level security;
-alter table events    enable row level security;
+alter table events        enable row level security;
 
 drop policy if exists "items: чтение"    on items;
 drop policy if exists "channels: чтение" on channels;
 drop policy if exists "accounts: свой"   on accounts;
 drop policy if exists "players: свой"    on players;
 drop policy if exists "inventory: свой"  on inventory;
-drop policy if exists "catches: свой"    on catches;
+drop policy if exists "catches: свой"       on catches;
 drop policy if exists "events: свой"     on events;
 
 -- Справочники читают все вошедшие.
@@ -138,19 +138,28 @@ comment on function claim_profile() is
 -- equip_item / unequip_item: единственные изменения из веба
 -- ---------------------------------------------------------------------------
 
-create or replace function equip_item(p_inventory_id bigint)
+-- Пересоздаём: добавился p_message_id, а старая версия с одной колонкой
+-- сделала бы вызов с одним аргументом неоднозначным.
+drop function if exists equip_item(bigint);
+
+create or replace function equip_item(p_inventory_id bigint, p_message_id text default null)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
 declare
-    v_user    bigint;
-    v_channel bigint;
-    v_type    item_kind;
+    v_user         bigint;
+    v_channel      bigint;
+    v_type         item_kind;
+    v_item_id      text;
+    v_prev_id      bigint;
+    v_prev_item_id text;
+    -- Из кабинета message_id всегда пустой; бот передаёт id своего сообщения.
+    v_message_id   text := case when auth.uid() is null then nullif(p_message_id, '') end;
 begin
-    select i.user_id, i.channel_id, i.item_type
-      into v_user, v_channel, v_type
+    select i.user_id, i.channel_id, i.item_type, i.item_id
+      into v_user, v_channel, v_type, v_item_id
       from inventory i
      where i.id = p_inventory_id
        and exists (
@@ -176,23 +185,60 @@ begin
      where channel_id = v_channel
        and user_id    = v_user
        and item_type  = v_type
-       and is_equipped;
+       and is_equipped
+    returning id, item_id into v_prev_id, v_prev_item_id;
+
+    -- Старый предмет слетает сам — пишем это как отдельное снятие, иначе
+    -- в журнале видно только надевание нового.
+    if found and v_prev_id <> p_inventory_id then
+        insert into events (channel_id, user_id, type, message_id, payload)
+        values (
+            v_channel, v_user, 'inventory_unequip', v_message_id,
+            jsonb_build_object(
+                'inventoryId', v_prev_id,
+                'itemId',      v_prev_item_id,
+                'itemType',    v_type,
+                'source',      case when v_message_id is null then 'web' else 'bot' end,
+                'replacedBy',  p_inventory_id,
+                'implicit',    true
+            )
+        );
+    end if;
 
     update inventory
        set is_equipped = true,
            updated_at  = now()
      where id = p_inventory_id;
+
+    insert into events (channel_id, user_id, type, message_id, payload)
+    values (
+        v_channel, v_user, 'inventory_equip', v_message_id,
+        jsonb_build_object(
+            'inventoryId', p_inventory_id,
+            'itemId',      v_item_id,
+            'itemType',    v_type,
+            'source',      case when v_message_id is null then 'web' else 'bot' end
+        )
+    );
 end $$;
 
-comment on function equip_item(bigint) is
-    'Надевает предмет игрока, снимая предыдущий предмет того же слота.';
+comment on function equip_item(bigint, text) is
+    'Надевает предмет игрока и пишет событие inventory_equip в events.';
 
-create or replace function unequip_item(p_inventory_id bigint)
+drop function if exists unequip_item(bigint);
+
+create or replace function unequip_item(p_inventory_id bigint, p_message_id text default null)
 returns void
 language plpgsql
 security definer
 set search_path = public
 as $$
+declare
+    v_user       bigint;
+    v_channel    bigint;
+    v_type       item_kind;
+    v_item_id    text;
+    v_message_id text := case when auth.uid() is null then nullif(p_message_id, '') end;
 begin
     update inventory i
        set is_equipped = false,
@@ -201,15 +247,28 @@ begin
        and exists (
            select 1 from accounts a
            where a.auth_id = auth.uid() and a.user_id = i.user_id
-       );
+       )
+    returning i.user_id, i.channel_id, i.item_type, i.item_id
+      into v_user, v_channel, v_type, v_item_id;
 
     if not found then
         raise exception 'предмет не найден' using errcode = 'P0002';
     end if;
+
+    insert into events (channel_id, user_id, type, message_id, payload)
+    values (
+        v_channel, v_user, 'inventory_unequip', v_message_id,
+        jsonb_build_object(
+            'inventoryId', p_inventory_id,
+            'itemId',      v_item_id,
+            'itemType',    v_type,
+            'source',      case when v_message_id is null then 'web' else 'bot' end
+        )
+    );
 end $$;
 
-comment on function unequip_item(bigint) is
-    'Снимает предмет игрока.';
+comment on function unequip_item(bigint, text) is
+    'Снимает предмет игрока и пишет событие inventory_unequip в events.';
 
 -- ---------------------------------------------------------------------------
 -- Привилегии на таблицы
@@ -232,9 +291,9 @@ grant usage, select on all sequences in schema public to service_role;
 -- ---------------------------------------------------------------------------
 
 revoke all on function claim_profile()          from public, anon;
-revoke all on function equip_item(bigint)       from public, anon;
-revoke all on function unequip_item(bigint)     from public, anon;
+revoke all on function equip_item(bigint, text)   from public, anon;
+revoke all on function unequip_item(bigint, text) from public, anon;
 
 grant execute on function claim_profile()       to authenticated;
-grant execute on function equip_item(bigint)    to authenticated;
-grant execute on function unequip_item(bigint)  to authenticated;
+grant execute on function equip_item(bigint, text)   to authenticated;
+grant execute on function unequip_item(bigint, text) to authenticated;
