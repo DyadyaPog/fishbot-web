@@ -1295,8 +1295,15 @@
             return;
         }
 
+        /* Страховка только на случай зависшего getSession. Как только сессия
+           получена, таймер снимаем: loadPlayer может грузиться долго, и
+           auth-pending должен держаться до конца загрузки профиля. */
+        let sessionGuard = setTimeout(() => document.body.classList.remove('auth-pending'), 5000);
+
         try {
             const { data, error } = await client.auth.getSession();
+            clearTimeout(sessionGuard);
+            sessionGuard = null;
             if (error) throw error;
             if (!data.session) {
                 document.body.classList.remove('auth-pending');
@@ -1312,6 +1319,7 @@
             renderAuthOnly();
             toast(`Не удалось восстановить сессию: ${shortError(error)}`);
         } finally {
+            if (sessionGuard) clearTimeout(sessionGuard);
             document.body.classList.remove('auth-pending');
         }
     }
@@ -1365,8 +1373,6 @@
         renderRankings();
         /* Гостевой экран не показываем до проверки сессии. */
         setStatus('Проверка входа…', true);
-        /* Страховка: если getSession завис, через 5 секунд показываем гостя. */
-        setTimeout(() => document.body.classList.remove('auth-pending'), 5000);
         startSession();
     });
 })();
