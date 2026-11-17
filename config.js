@@ -7,6 +7,7 @@
 window.FISHBOT_CONFIG = {
     supabaseUrl: '',
     supabaseAnonKey: '',
-    // Версия схемы данных: 2 — данные разделены по каналам.
-    schemaVersion: 2
+    // Версия схемы данных: 3 — данные разделены по каналам, магазин читает
+    // окно артефактов из shop_state и покупает через RPC.
+    schemaVersion: 3
 };

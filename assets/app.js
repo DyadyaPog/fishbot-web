@@ -1810,7 +1810,11 @@
         }
         if (!client) return;
 
-        const { data, error } = await client.rpc('sell_item', { p_inventory_id: Number(item.id) });
+        /* Количество не передаём: sell_item с null продаёт всю строку. */
+        const { data, error } = await client.rpc('sell_item', {
+            p_inventory_id: Number(item.id),
+            p_quantity: null
+        });
         if (error) {
             console.error(error);
             toast(`Не удалось продать: ${shortError(error)}`);

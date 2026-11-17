@@ -89,6 +89,13 @@ begin
     end if;
 
     select * into v_item from items where id = v_row.item_id;
+    if not found then
+        return jsonb_build_object(
+            'ok', false,
+            'code', 'not_found',
+            'error', 'Предмет отсутствует в каталоге.'
+        );
+    end if;
 
     v_meta := coalesce(v_row.meta, '{}'::jsonb);
     v_quantity := greatest(1, coalesce(v_row.quantity, 1));

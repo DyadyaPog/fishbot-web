@@ -77,7 +77,8 @@ drop function if exists sell_item(bigint, text);
 
 create or replace function sell_item(
     p_inventory_id bigint,
-    p_quantity     integer default 1,
+    -- null — продать всю строку: так продаёт кабинет, у которого нет выбора количества.
+    p_quantity     integer default null,
     p_message_id   text default null
 )
 returns jsonb
