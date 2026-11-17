@@ -295,7 +295,12 @@
             quantity: Number(row.quantity) || 1,
             is_equipped: Boolean(row.is_equipped),
             meta: inventoryMetaText(row),
-            description: (row.meta && typeof row.meta === 'object' && row.meta.description) ? String(row.meta.description) : '',
+            /* Описание берётся из справочника items (бот синхронизирует его из
+               конфигов); если в items пусто — fallback на meta.description
+               (для старых строк и демо-данных). */
+            description: (item.description != null && String(item.description).trim() !== '')
+                ? String(item.description)
+                : ((rawMeta.description != null && String(rawMeta.description).trim() !== '') ? String(rawMeta.description) : ''),
             /* Тип артефакта из meta (catch/treasure/luck/gold/comfort/mystic). */
             artifactType: rawMeta.type ? String(rawMeta.type) : null,
             effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : [],
@@ -425,7 +430,7 @@
 
         const [inventory, catches, ranking] = await Promise.all([
             client.from('inventory')
-                .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at,items(name,rarity,price,kind)')
+                .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at,items(name,rarity,price,kind,description)')
                 .eq('channel_id', channelId)
                 .eq('user_id', state.userId)
                 .order('item_type')
