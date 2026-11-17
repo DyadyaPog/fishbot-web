@@ -1011,9 +1011,12 @@
             ? 'Сначала снимите предмет'
             : (item.cursed ? 'Проклятый артефакт продать нельзя' : 'Продать предмет');
         const sellButton = `<button class="btn-admin" data-action="sell" data-id="${esc(id)}"${item.is_equipped || item.cursed ? ' disabled' : ''} title="${sellTitle}">Продать</button>`;
+        const cleanseButton = item.item_type === 'ARTIFACT' && item.cursed
+            ? `<button class="btn-admin primary" data-action="cleanse" data-id="${esc(id)}" title="Снять проклятие: свиток очищения или гадалка за монеты">Очистить</button>`
+            : '';
         const secondary = item.item_type === 'CONSUMABLE'
             ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
-            : sellButton;
+            : cleanseButton + sellButton;
 
         /* Цена — из RPC inventory_sell_prices, то есть ровно та, что выплатит sell_item. */
         const hasSellPrice = item.sell_price != null && Number.isFinite(Number(item.sell_price));
@@ -1187,6 +1190,60 @@
 
         channel.inventory = (data || []).map(mapInventoryRow);
         await attachSellPrices(channel, channelId);
+    }
+
+    /* Очистка артефакта: свиток или гадалка. Всю механику и ролл
+       выполняет RPC cleanse_artifact, браузер только показывает результат. */
+    async function cleanseCursedArtifact(rawId) {
+        const channel = currentChannel();
+        if (!channel) return;
+
+        const item = channel.inventory.find((entry) => String(entry.id) === String(rawId));
+        if (!item || item.item_type !== 'ARTIFACT' || !item.cursed) return;
+
+        if (state.demo) {
+            toast('Демо-режим: очистка артефактов недоступна');
+            return;
+        }
+        if (!client) return;
+
+        const hasScroll = channel.inventory.some((entry) =>
+            entry.item_id === 'scroll_of_cleansing' && Number(entry.quantity) > 0
+        );
+        const hint = hasScroll
+            ? 'Будет использован свиток очищения.'
+            : 'Свитка нет: гадалка возьмёт монеты, и есть риск усилить проклятие.';
+        if (!window.confirm(`Снять проклятие с «${item.name}»? ${hint}`)) return;
+
+        const { data, error } = await client.rpc('cleanse_artifact', {
+            p_inventory_id: Number(item.id)
+        });
+
+        if (error) {
+            console.error(error);
+            toast(`Не удалось очистить: ${shortError(error)}`);
+            return;
+        }
+        if (!data || data.ok !== true) {
+            toast((data && data.error) || 'Не удалось очистить артефакт');
+            return;
+        }
+
+        if (data.balance != null) channel.player.balance = Number(data.balance) || 0;
+
+        await reloadInventory(channel.id);
+        renderProfile();
+        renderInventory();
+        renderArtifacts();
+        renderLoadout();
+
+        if (data.method === 'failed') {
+            toast(`Гадалка не справилась: проклятие «${item.name}» усилено, потрачено ${formatMoney(data.cost)}`);
+        } else if (data.method === 'scroll') {
+            toast(`Свиток очищения сжёг проклятие: ${item.name}`);
+        } else {
+            toast(`Гадалка сняла проклятие с «${item.name}» за ${formatMoney(data.cost)}`);
+        }
     }
 
     /* Продажа: владельца строки и цену проверяет и считает только база (RPC sell_item). */
@@ -1417,6 +1474,12 @@
             const button = event.target.closest('[data-action="sell"]');
             if (!button || button.disabled) return;
             sellItem(button.dataset.id);
+        });
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="cleanse"]');
+            if (!button || button.disabled) return;
+            cleanseCursedArtifact(button.dataset.id);
         });
 
         document.addEventListener('click', (event) => {
