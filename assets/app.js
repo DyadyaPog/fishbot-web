@@ -714,7 +714,7 @@
         const player = channel.player;
         const catches = channel.catches || [];
 
-        el('stat-balance').textContent = `${Number(player.balance || 0).toLocaleString('ru-RU')} 💰`;
+        el('stat-balance').textContent = `${Number(player.balance || 0).toLocaleString('ru-RU')}`;
         el('stat-level').textContent = player.level;
         el('stat-fish').textContent = Number(player.fishCaught || 0).toLocaleString('ru-RU');
 
@@ -725,6 +725,8 @@
         el('xp-fill').style.width = `${percent.toFixed(1)}%`;
         el('xp-current').textContent = `${Number(player.xp).toLocaleString('ru-RU')} XP`;
         el('xp-next').textContent = `до ${Number(next).toLocaleString('ru-RU')} XP`;
+        const xpPercent = el('xp-percent');
+        if (xpPercent) xpPercent.textContent = `${percent.toFixed(0)}%`;
 
         if (channel.loadError) {
             el('recent-catches').innerHTML = '<div class="empty-state">Не удалось загрузить уловы</div>';

@@ -89,38 +89,41 @@
         <section id="profile" class="tab-content">
             <div class="dashboard-layout profile-layout">
                 <div class="profile-side">
-                    <div class="dashboard-panel animate-up">
+                    <div class="dashboard-panel animate-up profile-card">
                         <div class="panel-header">
-                            <div class="panel-title"><span class="panel-icon">⭐</span> Уровень</div>
+                            <div class="panel-title"><span class="panel-icon">⭐</span> Игрок</div>
                         </div>
-                        <div class="profile-frame-value" id="stat-level">1</div>
-                    </div>
+                        <div class="profile-card-body">
+                            <div class="profile-stats-grid">
+                                <div class="profile-stat">
+                                    <div class="profile-stat-icon">⭐</div>
+                                    <div class="profile-stat-label">Уровень</div>
+                                    <div class="profile-stat-value" id="stat-level">1</div>
+                                </div>
+                                <div class="profile-stat">
+                                    <div class="profile-stat-icon">💰</div>
+                                    <div class="profile-stat-label">Баланс</div>
+                                    <div class="profile-stat-value" id="stat-balance">0</div>
+                                </div>
+                                <div class="profile-stat">
+                                    <div class="profile-stat-icon">🐟</div>
+                                    <div class="profile-stat-label">Поймано</div>
+                                    <div class="profile-stat-value" id="stat-fish">0</div>
+                                </div>
+                            </div>
 
-                    <div class="dashboard-panel animate-up">
-                        <div class="panel-header">
-                            <div class="panel-title"><span class="panel-icon">📈</span> Прогресс</div>
-                        </div>
-                        <div class="profile-frame-body">
-                            <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width: 0%"></div></div>
-                            <div class="xp-caption">
-                                <span id="xp-current">0 XP</span>
-                                <span id="xp-next">до следующего уровня</span>
+                            <div class="profile-xp">
+                                <div class="profile-xp-head">
+                                    <div class="profile-xp-title"><span class="panel-icon">📈</span> Прогресс</div>
+                                    <div class="profile-xp-percent" id="xp-percent">0%</div>
+                                </div>
+                                <div class="xp-track"><div class="xp-fill" id="xp-fill" style="width: 0%"></div></div>
+                                <div class="xp-caption">
+                                    <span id="xp-current">0 XP</span>
+                                    <span id="xp-next">до следующего уровня</span>
+                                </div>
                             </div>
                         </div>
-                    </div>
-
-                    <div class="dashboard-panel animate-up">
-                        <div class="panel-header">
-                            <div class="panel-title"><span class="panel-icon">💰</span> Баланс</div>
-                        </div>
-                        <div class="profile-frame-value" id="stat-balance">0</div>
-                    </div>
-
-                    <div class="dashboard-panel animate-up">
-                        <div class="panel-header">
-                            <div class="panel-title"><span class="panel-icon">🐟</span> Поймано</div>
-                        </div>
-                        <div class="profile-frame-value" id="stat-fish">0</div>
                     </div>
                 </div>
 
