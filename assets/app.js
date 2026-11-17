@@ -11,6 +11,9 @@
     const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && HAS_SDK);
     const client = SUPABASE_READY ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
     const STORAGE_KEY = 'fishbot.channel';
+    const ITEMS_CACHE_KEY = 'fishbot.items.catalog';
+    const ITEMS_CACHE_AT_KEY = 'fishbot.items.catalog.at';
+    const ITEMS_CACHE_TTL = 60 * 60 * 1000;
     const MAX_CATCHES = 10;
     const MAX_RANKING = 25;
 
@@ -192,7 +195,10 @@
         loaded: false,
         userId: null,
         username: '',
-        filters: { type: 'all', rarity: 'all', q: '' }
+        filters: { type: 'all', rarity: 'all', q: '' },
+        /* Локальный кэш справочника items (имя/редкость/цена/тип/описание). */
+        itemsCatalog: new Map(),
+        itemsCatalogLoaded: false
     };
 
     const TITLES = {
@@ -216,6 +222,57 @@
         || null;
 
     const currentInventory = () => (currentChannel() || {}).inventory || [];
+
+    /* Локальный кэш справочника items: загружается один раз при авторизации
+       (и при ручном обновлении), хранится в localStorage с TTL 1 час.
+       Описания и метаданные берутся отсюда, а не отдельными запросами. */
+    async function loadItemsCatalog(force) {
+        if (!SUPABASE_READY || state.demo) return;
+        const now = Date.now();
+        if (!force && state.itemsCatalogLoaded && state.itemsCatalog.size) {
+            const at = Number(localStorage.getItem(ITEMS_CACHE_AT_KEY) || 0);
+            if (now - at < ITEMS_CACHE_TTL) return;
+        }
+        if (!force) {
+            try {
+                const raw = localStorage.getItem(ITEMS_CACHE_KEY);
+                const at = Number(localStorage.getItem(ITEMS_CACHE_AT_KEY) || 0);
+                if (raw && now - at < ITEMS_CACHE_TTL) {
+                    const arr = JSON.parse(raw);
+                    state.itemsCatalog = new Map((arr || []).map((x) => [String(x.id), {
+                        name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description
+                    }]));
+                    state.itemsCatalogLoaded = true;
+                    return;
+                }
+            } catch (e) { /* повреждённый кэш — перезагрузим */ }
+        }
+        try {
+            const { data, error } = await client.from('items').select('id,name,rarity,price,kind,description');
+            if (error) throw error;
+            state.itemsCatalog = new Map((data || []).map((x) => [String(x.id), {
+                name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description
+            }]));
+            state.itemsCatalogLoaded = true;
+            try {
+                const arr = [...state.itemsCatalog.entries()].map(([id, v]) => ({ id, ...v }));
+                localStorage.setItem(ITEMS_CACHE_KEY, JSON.stringify(arr));
+                localStorage.setItem(ITEMS_CACHE_AT_KEY, String(Date.now()));
+            } catch (e) { /* приватный режим */ }
+        } catch (error) {
+            console.warn('items catalog:', error.message);
+        }
+    }
+
+    function clearItemsCache() {
+        state.itemsCatalog = new Map();
+        state.itemsCatalogLoaded = false;
+        try { localStorage.removeItem(ITEMS_CACHE_KEY); localStorage.removeItem(ITEMS_CACHE_AT_KEY); } catch (e) {}
+    }
+
+    function itemMeta(id) {
+        return state.itemsCatalog.get(String(id)) || null;
+    }
 
     function toast(message) {
         const node = el('toast');
@@ -282,7 +339,7 @@
     }
 
     function mapInventoryRow(row) {
-        const item = row.items && typeof row.items === 'object' ? row.items : {};
+        const item = itemMeta(row.item_id) || (row.items && typeof row.items === 'object' ? row.items : {});
         const rawMeta = row.meta && typeof row.meta === 'object' ? row.meta : {};
         return {
             id: String(row.id),
@@ -318,6 +375,9 @@
             const claim = await client.rpc('claim_profile');
             if (claim.error) throw claim.error;
             state.userId = claim.data == null ? null : String(claim.data);
+
+            /* Справочник items обновляем при авторизации (триггер). */
+            await loadItemsCatalog(true);
 
             const response = await client
                 .from('my_channels')
@@ -428,15 +488,24 @@
         const channel = state.channels.find((entry) => entry.id === String(channelId));
         if (!channel || !SUPABASE_READY || !state.userId) return;
 
+        /* Справочник items нужен для имён/описаний; грузим его до маппинга. */
+        await loadItemsCatalog();
+        if (!state.itemsCatalogLoaded || !state.itemsCatalog.size) {
+            toast('Не удалось загрузить справочник предметов');
+        }
+
         const [inventory, catches, ranking] = await Promise.all([
+            /* Справочник items подгружается отдельно и кэшируется локально,
+               поэтому здесь только данные игрока — без join и без дублирования
+               метаданных. */
             client.from('inventory')
-                .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at,items(name,rarity,price,kind,description)')
+                .select('id,item_id,item_type,quantity,meta,is_equipped,expires_at')
                 .eq('channel_id', channelId)
                 .eq('user_id', state.userId)
                 .order('item_type')
                 .order('id'),
             client.from('catches')
-                .select('item_id,price,caught_at,items(name,rarity,description)')
+                .select('item_id,price,caught_at')
                 .eq('channel_id', channelId)
                 .eq('user_id', state.userId)
                 .order('caught_at', { ascending: false })
@@ -482,7 +551,7 @@
 
         await attachSellPrices(channel, channelId);
         channel.catches = (catches.data || []).map((row) => {
-            const item = row.items && typeof row.items === 'object' ? row.items : {};
+            const item = itemMeta(row.item_id) || (row.items && typeof row.items === 'object' ? row.items : {});
             return {
                 name: item.name || row.item_id,
                 rarity: item.rarity || 'common',
@@ -497,6 +566,26 @@
             value: formatMoney(row.balance),
             level: Number(row.level) || 1
         }));
+    }
+
+    /* Общее обновление: сбрасывает кэш справочника items и перезагружает
+       данные текущего канала. Триггер — кнопка «↻ Обновить» у ника. */
+    async function refreshAllData() {
+        if (!SUPABASE_READY || state.demo || !state.session) return;
+        const button = el('btn-refresh-data');
+        if (button) button.disabled = true;
+        try {
+            clearItemsCache();
+            await loadItemsCatalog(true);
+            const channel = currentChannel();
+            if (channel) await loadChannel(channel.id);
+            renderAll();
+            toast('Данные обновлены.');
+        } catch (error) {
+            toast(`Не удалось обновить: ${shortError(error)}`);
+        } finally {
+            if (button) button.disabled = false;
+        }
     }
 
     /* Обновляет цены без полной перезагрузки канала: окно полного возврата
@@ -590,6 +679,9 @@
         } else {
             chip.hidden = true;
         }
+
+        const refreshBtn = el('btn-refresh-data');
+        if (refreshBtn) refreshBtn.hidden = !(state.session && !state.demo);
 
         const login = el('btn-login');
         if (state.demo || !state.session) {
@@ -1220,6 +1312,7 @@
     window.handleLogin = handleLogin;
     window.setFilter = setFilter;
     window.selectChannel = selectChannel;
+    window.refreshAllData = refreshAllData;
 
     document.addEventListener('DOMContentLoaded', () => {
         bind();
