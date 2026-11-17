@@ -63,6 +63,24 @@
         mystic: { label: 'Мистика', emoji: '🌀' }
     };
 
+    /* Подписи шансов совпадают с LOOT_DETAILS / RARITY_DETAILS бота: проценты
+       считает бот и складывает в player_chances, кабинет их только рисует. */
+    const LOOT_LABELS = {
+        fish: { label: 'Рыба', icon: '🐟', color: '#38bdf8' },
+        trash: { label: 'Мусор', icon: '🟤', color: '#94a3b8' },
+        treasure: { label: 'Сокровище', icon: '🪎', color: '#fbbf24' },
+        empty: { label: 'Пустота', icon: '💨', color: '#64748b' }
+    };
+
+    const RARITY_LABELS = {
+        common: 'Обычная',
+        uncommon: 'Необычная',
+        rare: 'Редкая',
+        epic: 'Эпическая',
+        legendary: 'Легендарная',
+        mythic: 'Мифическая'
+    };
+
     const ITEM_TYPES = {
         ROD: { label: 'Удочка', icon: '🎣', equippable: true },
         LINE: { label: 'Леска', icon: '🧵', equippable: true },
@@ -112,7 +130,14 @@
                 { username: 'night_angler', value: '18 400 💰' },
                 { username: 'DemoFisher', value: '1 250 💰' },
                 { username: 'quiet_pike', value: '980 💰' }
-            ]
+            ],
+            chances: {
+                types: { fish: '72.00%', trash: '10.00%', treasure: '8.00%', empty: '10.00%' },
+                rarities_if_fish: {
+                    common: '58.30%', uncommon: '29.40%', rare: '7.60%',
+                    epic: '3.60%', legendary: '0.95%', mythic: '0.15%'
+                }
+            }
         },
         {
             id: 'night_angler',
@@ -145,7 +170,14 @@
                 { username: 'quiet_pike', value: '2 310 💰' },
                 { username: 'night_angler', value: '1 870 💰' },
                 { username: 'DemoFisher', value: '340 💰' }
-            ]
+            ],
+            chances: {
+                types: { fish: '69.50%', trash: '10.90%', treasure: '5.60%', empty: '14.00%' },
+                rarities_if_fish: {
+                    common: '63.20%', uncommon: '24.80%', rare: '8.10%',
+                    epic: '2.90%', legendary: '0.85%', mythic: '0.15%'
+                }
+            }
         }
     ];
 
@@ -425,6 +457,22 @@
 
         channel.loadError = null;
         channel.inventory = (inventory.data || []).map(mapInventoryRow);
+
+        /* Шансы — снимок расчёта бота. Таблица может быть ещё не создана
+           или строки ещё нет: это не повод ломать загрузку канала. */
+        const chances = await client
+            .from('player_chances')
+            .select('types,rarities_if_fish,updated_at')
+            .eq('channel_id', channelId)
+            .eq('user_id', state.userId)
+            .maybeSingle();
+        if (chances.error) {
+            console.warn('player_chances:', chances.error.message);
+            channel.chances = null;
+        } else {
+            channel.chances = chances.data || null;
+        }
+
         await attachSellPrices(channel, channelId);
         channel.catches = (catches.data || []).map((row) => {
             const item = row.items && typeof row.items === 'object' ? row.items : {};
@@ -593,6 +641,8 @@
             loadoutGrid.innerHTML = equipmentItems.map(renderItemCard).join('');
         }
 
+        renderChances();
+
         el('slot-grid').innerHTML = slots.map((type) => {
             const meta = ITEM_TYPES[type];
             const item = inventory.find((entry) => entry.item_type === type && entry.is_equipped);
@@ -615,6 +665,87 @@
                 </div>
             `;
         }).join('');
+    }
+
+    /* Шансы улова. Проценты приходят из player_chances: их считает бот
+       (!шансы) с учётом экипировки, артефактов и ручных настроек канала,
+       поэтому кабинет ничего не пересчитывает и не расходится с чатом. */
+    function chancePercent(value) {
+        const number = parseFloat(String(value == null ? '' : value).replace('%', '').replace(',', '.'));
+        return Number.isFinite(number) ? number : 0;
+    }
+
+    function chanceRow(label, icon, color, value) {
+        const percent = chancePercent(value);
+        const width = Math.max(0, Math.min(100, percent));
+        return `
+            <div class="chance-row">
+                <span class="chance-name"><span class="chance-icon">${icon}</span>${esc(label)}</span>
+                <span class="chance-bar"><span class="chance-fill" style="width:${width.toFixed(2)}%;background:${color}"></span></span>
+                <span class="chance-value">${percent.toFixed(1)}%</span>
+            </div>
+        `;
+    }
+
+    function renderChances() {
+        const host = el('chances-panel');
+        if (!host) return;
+
+        const channel = currentChannel();
+        const chances = channel && channel.chances;
+        const types = chances && chances.types;
+        const rarities = chances && chances.rarities_if_fish;
+
+        const header = (caption) => `
+            <div class="panel-header">
+                <div class="panel-title"><span class="panel-icon">🎯</span> Шансы улова</div>
+                <span class="chances-caption">${esc(caption)}</span>
+            </div>
+        `;
+
+        if (!types || Object.keys(types).length === 0) {
+            host.innerHTML = `
+                <div class="dashboard-panel">
+                    ${header('считает бот')}
+                    <div class="chances-body">
+                        <div class="empty-state">Шансы появятся после первого заброса в чате</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const typeRows = Object.keys(LOOT_LABELS)
+            .filter((key) => types[key] !== undefined)
+            .map((key) => {
+                const info = LOOT_LABELS[key];
+                return chanceRow(info.label, info.icon, info.color, types[key]);
+            })
+            .join('');
+
+        const rarityRows = Object.keys(RARITY_LABELS)
+            .filter((key) => rarities && rarities[key] !== undefined)
+            .map((key) => {
+                const info = RARITY[key] || RARITY.empty;
+                return chanceRow(RARITY_LABELS[key], info.icon, info.color, rarities[key]);
+            })
+            .join('');
+
+        host.innerHTML = `
+            <div class="dashboard-panel">
+                ${header('с учётом экипировки и артефактов')}
+                <div class="chances-body">
+                    <div class="chances-group">
+                        <div class="chances-group-title">Тип улова</div>
+                        ${typeRows}
+                    </div>
+                    <div class="chances-group">
+                        <div class="chances-group-title">Редкость, если клюнула рыба</div>
+                        ${rarityRows}
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     function filteredInventory() {
@@ -756,7 +887,13 @@
         if (counter) counter.textContent = `${items.length} артефактов`;
 
         if (items.length === 0) {
-            grid.innerHTML = '<div class="empty-state">Артефактов нет</div>';
+            grid.innerHTML = `
+                <div class="artifacts-empty">
+                    <div class="artifacts-empty-icon">🔮</div>
+                    <div class="artifacts-empty-title">Артефактов пока нет</div>
+                    <div class="artifacts-empty-text">Купите артефакт в боте — он сразу появится здесь и начнёт действовать.</div>
+                </div>
+            `;
             return;
         }
 
