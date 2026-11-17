@@ -680,8 +680,8 @@
             chip.hidden = true;
         }
 
-        const refreshBtn = el('btn-refresh-data');
-        if (refreshBtn) refreshBtn.hidden = !(state.session && !state.demo);
+        const refreshItem = el('nav-refresh-data');
+        if (refreshItem) refreshItem.hidden = !(state.session && !state.demo);
 
         const login = el('btn-login');
         if (state.demo || !state.session) {
