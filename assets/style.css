@@ -1538,6 +1538,10 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     gap: 0.4rem;
 }
 
+.shop-item .inv-effects {
+    justify-content: center;
+}
+
 .inv-effect-chip {
     display: inline-flex;
     align-items: center;
@@ -2034,6 +2038,7 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
     font-size: 0.75rem;
     font-weight: 700;
     color: var(--warning);
+    text-align: center;
 }
 
 .shop-curse {
@@ -2041,6 +2046,7 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
     font-weight: 600;
     color: #f87171;
     opacity: 0.9;
+    text-align: center;
 }
 
 .shop-item { height: 100%; }
