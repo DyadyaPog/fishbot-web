@@ -37,33 +37,33 @@ create policy "channels: чтение" on channels
 
 -- Своя связка Twitch ID ↔ auth.
 create policy "accounts: свой" on accounts
-    for select to authenticated using (auth_id = auth.uid());
+    for select to authenticated using (auth_id = (select auth.uid()));
 
 -- Свои профили на всех каналах (источник my_channels).
 create policy "players: свой" on players
     for select to authenticated
-    using (user_id in (select a.user_id from accounts a where a.auth_id = auth.uid()));
+    using (user_id in (select a.user_id from accounts a where a.auth_id = (select auth.uid())));
 
 -- Личный инвентарь, журнал уловов и события.
 create policy "inventory: свой" on inventory
     for select to authenticated
     using (exists (
         select 1 from accounts a
-        where a.auth_id = auth.uid() and a.user_id = inventory.user_id
+        where a.auth_id = (select auth.uid()) and a.user_id = inventory.user_id
     ));
 
 create policy "catches: свой" on catches
     for select to authenticated
     using (exists (
         select 1 from accounts a
-        where a.auth_id = auth.uid() and a.user_id = catches.user_id
+        where a.auth_id = (select auth.uid()) and a.user_id = catches.user_id
     ));
 
 create policy "events: свой" on events
     for select to authenticated
     using (exists (
         select 1 from accounts a
-        where a.auth_id = auth.uid() and a.user_id = events.user_id
+        where a.auth_id = (select auth.uid()) and a.user_id = events.user_id
     ));
 
 -- ---------------------------------------------------------------------------

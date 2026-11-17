@@ -33,7 +33,7 @@ select
 from players p
 join channels c on c.id = p.channel_id
 join accounts a on a.user_id = p.user_id
-where a.auth_id = auth.uid()
+where a.auth_id = (select auth.uid())
 order by c.login;
 
 comment on view my_channels is
@@ -59,7 +59,7 @@ where exists (
     from players me
     join accounts a on a.user_id = me.user_id
     where me.channel_id = p.channel_id
-      and a.auth_id = auth.uid()
+      and a.auth_id = (select auth.uid())
 );
 
 comment on view channel_ranking is

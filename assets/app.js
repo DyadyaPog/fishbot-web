@@ -750,7 +750,7 @@
 
         client.auth.signInWithOAuth({
             provider: 'twitch',
-            options: { redirectTo: redirectUrl(), scopes: 'user:read:email' }
+            options: { redirectTo: redirectUrl() }
         }).then(({ error }) => {
             if (!error) return;
             console.error(error);

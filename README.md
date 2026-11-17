@@ -60,9 +60,14 @@ window.FISHBOT_CONFIG = {
   на разных каналах.
 - Схема и наполнение — SQL-скрипты в `supabase/`; данные из SQLite переносит
   `fishBot/scripts/migrate-to-supabase.mjs` (`npm run db:migrate`).
-- Провайдер Twitch в **Authentication → Providers**; адрес страницы — в
-  **Authentication → URL Configuration** (redirect URL). Для локального запуска это
-  `http://localhost:4173/`, для Pages — `https://<user>.github.io/<repo>/`.
+- Провайдер Twitch в **Authentication → Providers**.
+- В **Authentication → URL Configuration**:
+  - **Site URL** — куда Supabase вернёт вход, если адрес не разрешён. Дефолтный
+    `http://localhost:3000` — причина, по которой после Twitch открывается он.
+  - **Redirect URLs** — точные адреса страницы: `http://localhost:4173/` и
+    `https://<user>.github.io/<repo>/` (можно `https://<user>.github.io/<repo>/**`).
+    Страница передаёт свой текущий адрес в `redirectTo`; не попавший в этот список
+    адрес подменяется на Site URL.
 - При первом входе `claim_profile()` связывает Twitch ID с `auth.users.id`; дальше
   страница читает `my_channels`, `inventory`, `catches`, `channel_ranking` под RLS.
 - RLS: игрок читает только свои строки; экипировка — через RPC `equip_item` /
