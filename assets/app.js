@@ -62,6 +62,16 @@
         empty: { icon: '💨', color: 'var(--rarity-empty)' }
     };
 
+    /* Эмодзи редкости в свойствах артефактов совпадают с RARITY_DETAILS бота. */
+    const RARITY_EFFECT_ICONS = {
+        common: '⚪️',
+        uncommon: '🟢',
+        rare: '🔵',
+        epic: '🟣',
+        legendary: '🟡',
+        mythic: '🔴'
+    };
+
     /* Типы артефактов совпадают с ARTIFACT_TYPE_DETAILS бота. */
     const ARTIFACT_TYPES = {
         catch: { label: 'Улов', emoji: '🎣' },
@@ -966,14 +976,10 @@
                 const emoji = { fish: ' Joel ', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
                 return `${emoji}×${percent(value)}`;
             }
-            case 'rarity_modifier': {
-                const rarity = RARITY[effect.target];
-                return `${rarity ? rarity.icon : ''}×${percent(value)}`;
-            }
-            case 'rarity_bonus': {
-                const rarity = RARITY[effect.target];
-                return `${rarity ? rarity.icon : ''}${value >= 0 ? '+' : ''}${value} к весу`;
-            }
+            case 'rarity_modifier':
+                return `${RARITY_EFFECT_ICONS[effect.target] || ''}×${percent(value)}`;
+            case 'rarity_bonus':
+                return `${RARITY_EFFECT_ICONS[effect.target] || ''}${value >= 0 ? '+' : ''}${value} к весу`;
             case 'gold_bonus':
                 return `${value >= 0 ? '+' : ''}${value}💰/заброс`;
             case 'xp_multiplier':
