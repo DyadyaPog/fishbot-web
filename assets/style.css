@@ -1407,7 +1407,8 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     gap: 1rem;
 }
 
-#artifacts-grid {
+#artifacts-grid,
+#loadout-grid {
     justify-items: center;
     grid-template-columns: repeat(auto-fit, minmax(250px, 320px));
 }
