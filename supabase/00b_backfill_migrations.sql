@@ -122,6 +122,15 @@ begin
     if to_regclass('public.items_public') is not null then
         perform register_migration('25_items_public.sql');
     end if;
+
+    if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'items'
+           and column_name = 'type_modifiers'
+    ) then
+        perform register_migration('27_equipment_modifiers.sql');
+    end if;
 end $$;
 
 -- Что в итоге считается применённым (неотмеченные шаги ещё нужно выполнить).

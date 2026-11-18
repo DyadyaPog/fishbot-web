@@ -127,10 +127,10 @@
                 fishCaught: 312
             },
             inventory: [
-                { item_id: 'rod_rare_1', item_type: 'ROD', name: 'Удочка «Прилив»', rarity: 'rare', quantity: 1, is_equipped: true, meta: 'Прочность 82 / 100' },
-                { item_id: 'rod_common_1', item_type: 'ROD', name: 'Бамбуковая удочка', rarity: 'common', quantity: 1, is_equipped: false, meta: 'Прочность 45 / 100' },
-                { item_id: 'line_epic_1', item_type: 'LINE', name: 'Леска «Бездна»', rarity: 'epic', quantity: 1, is_equipped: true, meta: 'Прочность 96 / 100' },
-                { item_id: 'hook_legendary_1', item_type: 'HOOK', name: 'Крючок Посейдона', rarity: 'legendary', quantity: 1, is_equipped: false, meta: 'Прочность 74 / 100' },
+                { item_id: 'rod_rare_1', item_type: 'ROD', name: 'Удочка «Прилив»', rarity: 'rare', type_modifiers: {"fish":1.21,"treasure":1.36,"trash":0.83,"empty":0.85}, rarity_modifiers: {"common":0.96,"uncommon":1.05,"rare":1.1,"epic":1.17,"legendary":1.22,"mythic":1.27}, quantity: 1, is_equipped: true, meta: 'Прочность 82 / 100' },
+                { item_id: 'rod_common_1', item_type: 'ROD', name: 'Бамбуковая удочка', rarity: 'common', type_modifiers: {"fish":1.05,"treasure":1.08,"trash":0.96,"empty":0.96}, rarity_modifiers: {"common":1,"uncommon":1.01,"rare":1.02,"epic":1.03,"legendary":1.04,"mythic":1.05}, quantity: 1, is_equipped: false, meta: 'Прочность 45 / 100' },
+                { item_id: 'line_epic_1', item_type: 'LINE', name: 'Леска «Бездна»', rarity: 'epic', type_modifiers: {"fish":1.23,"treasure":1.17,"trash":0.58,"empty":0.61}, rarity_modifiers: {"common":0.85,"uncommon":1,"rare":1.09,"epic":1.12,"legendary":1.12,"mythic":1.12}, quantity: 1, is_equipped: true, meta: 'Прочность 96 / 100' },
+                { item_id: 'hook_legendary_1', item_type: 'HOOK', name: 'Крючок Посейдона', rarity: 'legendary', type_modifiers: {"fish":1.12,"treasure":1.12,"trash":0.84,"empty":0.84}, rarity_modifiers: {"common":0.44,"uncommon":0.76,"rare":1.4,"epic":1.8,"legendary":2.12,"mythic":2.44}, quantity: 1, is_equipped: false, meta: 'Прочность 74 / 100' },
                 { item_id: 'bait_common_1', item_type: 'BAIT', name: 'Червь', rarity: 'common', quantity: 24, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'bait_rare_1', item_type: 'BAIT', name: 'Светящаяся приманка', rarity: 'rare', quantity: 5, is_equipped: false, meta: 'Повышает шанс редкой рыбы' },
                 { item_id: 'artifact_lucky_1', item_type: 'ARTIFACT', artifactType: 'luck', name: 'Амулет удачи', rarity: 'epic', quantity: 1, is_equipped: false, meta: '+12% к шансу сокровищ · не проклят', description: 'Дырявый, но рыбу почему-то притягивает.', effects: [{ type: 'rarity_bonus', target: 'treasure', value: 12 }, { type: 'cooldown_modifier', value: 0.85 }], cursed: false },
@@ -173,10 +173,10 @@
                 fishCaught: 87
             },
             inventory: [
-                { item_id: 'rod_common_2', item_type: 'ROD', name: 'Бамбуковая удочка', rarity: 'common', quantity: 1, is_equipped: true, meta: 'Прочность 61 / 100' },
-                { item_id: 'line_common_2', item_type: 'LINE', name: 'Леска новичка', rarity: 'common', quantity: 1, is_equipped: true, meta: 'Прочность 88 / 100' },
-                { item_id: 'hook_common_2', item_type: 'HOOK', name: 'Крючок новичка', rarity: 'common', quantity: 1, is_equipped: true, meta: 'Прочность 92 / 100' },
-                { item_id: 'bait_worm_2', item_type: 'BAIT', name: 'Червь', rarity: 'common', quantity: 7, is_equipped: true, meta: 'Расходуется при забросе' },
+                { item_id: 'rod_common_2', item_type: 'ROD', name: 'Бамбуковая удочка', rarity: 'common', type_modifiers: {"fish":1.05,"treasure":1.08,"trash":0.96,"empty":0.96}, rarity_modifiers: {"common":1,"uncommon":1.01,"rare":1.02,"epic":1.03,"legendary":1.04,"mythic":1.05}, quantity: 1, is_equipped: true, meta: 'Прочность 61 / 100' },
+                { item_id: 'line_common_2', item_type: 'LINE', name: 'Леска новичка', rarity: 'common', type_modifiers: {"fish":1.04,"treasure":1.02,"trash":0.94,"empty":0.94}, rarity_modifiers: {"common":1,"uncommon":1,"rare":1.01,"epic":1.01,"legendary":1.01,"mythic":1.01}, quantity: 1, is_equipped: true, meta: 'Прочность 88 / 100' },
+                { item_id: 'hook_common_2', item_type: 'HOOK', name: 'Крючок новичка', rarity: 'common', type_modifiers: {"fish":1.01,"treasure":1.01,"trash":0.98,"empty":0.98}, rarity_modifiers: {"common":0.96,"uncommon":0.98,"rare":1.04,"epic":1.08,"legendary":1.1,"mythic":1.12}, quantity: 1, is_equipped: true, meta: 'Прочность 92 / 100' },
+                { item_id: 'bait_worm_2', item_type: 'BAIT', name: 'Червь', rarity: 'common', type_modifiers: {"fish":1.45,"trash":0.6,"treasure":1,"empty":0.45}, rarity_modifiers: {"common":0.95,"uncommon":1.05,"rare":1,"epic":1,"legendary":1,"mythic":1}, quantity: 7, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'fish_rare_2', item_type: 'FISH', name: 'Зеркальный карп', rarity: 'rare', quantity: 1, is_equipped: false, meta: 'Цена продажи: 74 💰' },
                 { item_id: 'fish_common_2', item_type: 'FISH', name: 'Окунь', rarity: 'common', quantity: 4, is_equipped: false, meta: 'Цена продажи: 9 💰' }
             ],
@@ -251,21 +251,21 @@
 
     /* Демо-витрина: те же поля, что отдаёт shop_items, но без сети. */
     const DEMO_SHOP = [
-        { id: 'rod_common', name: 'Бамбуковая удочка', rarity: 'common', price: 900, levelRequired: 1, kind: 'rod', artifactType: null },
-        { id: 'line_common', name: 'Обычная леска', rarity: 'common', price: 650, levelRequired: 1, kind: 'line', artifactType: null },
-        { id: 'hook_common', name: 'Простой крючок', rarity: 'common', price: 450, levelRequired: 1, kind: 'hook', artifactType: null },
-        { id: 'bait_worm', name: 'Червь', rarity: 'common', price: 60, levelRequired: 1, kind: 'bait', artifactType: null },
+        { id: 'rod_common', name: 'Бамбуковая удочка', rarity: 'common', type_modifiers: {"fish":1.05,"treasure":1.08,"trash":0.96,"empty":0.96}, rarity_modifiers: {"common":1,"uncommon":1.01,"rare":1.02,"epic":1.03,"legendary":1.04,"mythic":1.05}, price: 900, levelRequired: 1, kind: 'rod', artifactType: null },
+        { id: 'line_common', name: 'Обычная леска', rarity: 'common', type_modifiers: {"fish":1.04,"treasure":1.02,"trash":0.94,"empty":0.94}, rarity_modifiers: {"common":1,"uncommon":1,"rare":1.01,"epic":1.01,"legendary":1.01,"mythic":1.01}, price: 650, levelRequired: 1, kind: 'line', artifactType: null },
+        { id: 'hook_common', name: 'Простой крючок', rarity: 'common', type_modifiers: {"fish":1.01,"treasure":1.01,"trash":0.98,"empty":0.98}, rarity_modifiers: {"common":0.96,"uncommon":0.98,"rare":1.04,"epic":1.08,"legendary":1.1,"mythic":1.12}, price: 450, levelRequired: 1, kind: 'hook', artifactType: null },
+        { id: 'bait_worm', name: 'Червь', rarity: 'common', type_modifiers: {"fish":1.45,"trash":0.6,"treasure":1,"empty":0.45}, rarity_modifiers: {"common":0.95,"uncommon":1.05,"rare":1,"epic":1,"legendary":1,"mythic":1}, price: 60, levelRequired: 1, kind: 'bait', artifactType: null },
         { id: 'art_sock', name: 'Носок с дыркой', rarity: 'common', price: 3000, levelRequired: 1, kind: 'artifact', artifactType: 'catch', effects: [{ type: 'type_modifier', target: 'fish', min: 0.99, max: 1.06 }, { type: 'type_modifier', target: 'trash', min: 0.96, max: 1.03 }, { type: 'type_modifier', target: 'treasure', min: 0.99, max: 1.04 }, { type: 'gold_bonus', min: -1, max: 3 }], curseChance: 0.30 },
-        { id: 'rod_uncommon', name: 'Карбоновая удочка', rarity: 'uncommon', price: 3600, levelRequired: 8, kind: 'rod', artifactType: null },
-        { id: 'bait_dough', name: 'Тесто', rarity: 'uncommon', price: 160, levelRequired: 8, kind: 'bait', artifactType: null },
+        { id: 'rod_uncommon', name: 'Карбоновая удочка', rarity: 'uncommon', type_modifiers: {"fish":1.13,"treasure":1.22,"trash":0.9,"empty":0.91}, rarity_modifiers: {"common":0.98,"uncommon":1.03,"rare":1.06,"epic":1.1,"legendary":1.13,"mythic":1.16}, price: 3600, levelRequired: 8, kind: 'rod', artifactType: null },
+        { id: 'bait_dough', name: 'Тесто', rarity: 'uncommon', type_modifiers: {"fish":1.35,"trash":0.65,"treasure":1.55,"empty":0.5}, rarity_modifiers: {"common":0.92,"uncommon":1.08,"rare":1.08,"epic":1.05,"legendary":1.02,"mythic":1}, price: 160, levelRequired: 8, kind: 'bait', artifactType: null },
         { id: 'art_spoon', name: 'Позолоченная ложка деда', rarity: 'uncommon', price: 12000, levelRequired: 8, kind: 'artifact', artifactType: 'gold', effects: [{ type: 'gold_bonus', min: -1, max: 4 }, { type: 'type_modifier', target: 'fish', min: 0.97, max: 1.01 }], curseChance: 0.24 },
-        { id: 'rod_rare', name: 'Удочка мастера', rarity: 'rare', price: 8500, levelRequired: 20, kind: 'rod', artifactType: null },
-        { id: 'bait_spoon', name: 'Блесна', rarity: 'rare', price: 450, levelRequired: 22, kind: 'bait', artifactType: null },
+        { id: 'rod_rare', name: 'Удочка мастера', rarity: 'rare', type_modifiers: {"fish":1.21,"treasure":1.36,"trash":0.83,"empty":0.85}, rarity_modifiers: {"common":0.96,"uncommon":1.05,"rare":1.1,"epic":1.17,"legendary":1.22,"mythic":1.27}, price: 8500, levelRequired: 20, kind: 'rod', artifactType: null },
+        { id: 'bait_spoon', name: 'Блесна', rarity: 'rare', type_modifiers: {"fish":1.15,"trash":0.8,"treasure":1.05,"empty":0.8}, rarity_modifiers: {"common":0.65,"uncommon":0.9,"rare":1.35,"epic":1.4,"legendary":1.3,"mythic":1.15}, price: 450, levelRequired: 22, kind: 'bait', artifactType: null },
         { id: 'art_glass_float', name: 'Стеклянный поплавок', rarity: 'rare', price: 35000, levelRequired: 20, kind: 'artifact', artifactType: 'comfort', effects: [{ type: 'bait_save_chance', min: 0, max: 0.08 }, { type: 'cooldown_modifier', min: 0.96, max: 1.02 }], curseChance: 0.20 },
-        { id: 'rod_epic', name: 'Удочка глубин', rarity: 'epic', price: 15500, levelRequired: 30, kind: 'rod', artifactType: null },
-        { id: 'rod_legendary', name: 'Посох Океана', rarity: 'legendary', price: 25800, levelRequired: 40, kind: 'rod', artifactType: null },
+        { id: 'rod_epic', name: 'Удочка глубин', rarity: 'epic', type_modifiers: {"fish":1.29,"treasure":1.5,"trash":0.75,"empty":0.78}, rarity_modifiers: {"common":0.94,"uncommon":1.06,"rare":1.15,"epic":1.24,"legendary":1.31,"mythic":1.38}, price: 15500, levelRequired: 30, kind: 'rod', artifactType: null },
+        { id: 'rod_legendary', name: 'Посох Океана', rarity: 'legendary', type_modifiers: {"fish":1.37,"treasure":1.65,"trash":0.65,"empty":0.69}, rarity_modifiers: {"common":0.92,"uncommon":1.08,"rare":1.2,"epic":1.32,"legendary":1.4,"mythic":1.48}, price: 25800, levelRequired: 40, kind: 'rod', artifactType: null },
         { id: 'art_tide_crown', name: 'Корона Прилива', rarity: 'legendary', price: 180000, levelRequired: 40, kind: 'artifact', artifactType: 'treasure', effects: [{ type: 'type_modifier', target: 'treasure', min: 0.97, max: 1.1 }, { type: 'xp_multiplier', min: 0.98, max: 1.04 }, { type: 'type_modifier', target: 'empty', min: 0.99, max: 1.05 }], curseChance: 0.16 },
-        { id: 'rod_mythic', name: 'Жезл Посейдона', rarity: 'mythic', price: 40000, levelRequired: 50, kind: 'rod', artifactType: null },
+        { id: 'rod_mythic', name: 'Жезл Посейдона', rarity: 'mythic', type_modifiers: {"fish":1.45,"treasure":1.8,"trash":0.55,"empty":0.6}, rarity_modifiers: {"common":0.9,"uncommon":1.1,"rare":1.25,"epic":1.4,"legendary":1.5,"mythic":1.6}, price: 40000, levelRequired: 50, kind: 'rod', artifactType: null },
         { id: 'art_poseidon_seal', name: 'Печать Посейдона', rarity: 'mythic', price: 400000, levelRequired: 50, kind: 'artifact', artifactType: 'catch', effects: [{ type: 'type_modifier', target: 'fish', min: 0.96, max: 1.08 }, { type: 'type_modifier', target: 'treasure', min: 0.96, max: 1.08 }, { type: 'rarity_modifier', target: 'mythic', min: 0.97, max: 1.1 }, { type: 'cooldown_modifier', min: 0.99, max: 1.06 }], curseChance: 0.08 }
     ];
 
@@ -310,7 +310,8 @@
                 if (raw && now - at < ITEMS_CACHE_TTL) {
                     const arr = JSON.parse(raw);
                     state.itemsCatalog = new Map((arr || []).map((x) => [String(x.id), {
-                        name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description
+                        name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description,
+                        type_modifiers: x.type_modifiers || null, rarity_modifiers: x.rarity_modifiers || null
                     }]));
                     state.itemsCatalogLoaded = true;
                     return;
@@ -322,10 +323,11 @@
                (25_items_public.sql), где только витринные колонки. */
             const { data, error } = await client
                 .from('items_public')
-                .select('id,name,rarity,price,kind,description');
+                .select('id,name,rarity,price,kind,description,type_modifiers,rarity_modifiers');
             if (error) throw error;
             state.itemsCatalog = new Map((data || []).map((x) => [String(x.id), {
-                name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description
+                name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description,
+                type_modifiers: x.type_modifiers || null, rarity_modifiers: x.rarity_modifiers || null
             }]));
             state.itemsCatalogLoaded = true;
             try {
@@ -435,7 +437,10 @@
             /* Тип артефакта из meta (catch/treasure/luck/gold/comfort/mystic). */
             artifactType: rawMeta.type ? String(rawMeta.type) : null,
             effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : [],
-            cursed: (row.meta && typeof row.meta === 'object') ? Boolean(row.meta.cursed) : false
+            cursed: (row.meta && typeof row.meta === 'object') ? Boolean(row.meta.cursed) : false,
+            /* Модификаторы снаряжения: из справочника items, с fallback на meta. */
+            type_modifiers: (item && item.type_modifiers) ? item.type_modifiers : (rawMeta.type_modifiers || null),
+            rarity_modifiers: (item && item.rarity_modifiers) ? item.rarity_modifiers : (rawMeta.rarity_modifiers || null)
         };
     }
 
@@ -1156,6 +1161,43 @@
         }
     }
 
+    function equipmentModsFor(item) {
+        if (!item) return null;
+        /* Сначала модификаторы самого предмета (демо-данные и shop_items),
+           затем — справочник items_public (единственный источник истины). */
+        if (item.type_modifiers || item.rarity_modifiers) {
+            return { type: item.type_modifiers || {}, rarity: item.rarity_modifiers || {} };
+        }
+        const meta = itemMeta(item.item_id || item.id);
+        if (meta && (meta.type_modifiers || meta.rarity_modifiers)) {
+            return { type: meta.type_modifiers || {}, rarity: meta.rarity_modifiers || {} };
+        }
+        /* Fallback для строк с суффиксом: ищем базовый id в справочнике. */
+        const id = String(item.item_id || item.id || '').replace(/_\d+$/, '');
+        const baseMeta = itemMeta(id);
+        if (baseMeta && (baseMeta.type_modifiers || baseMeta.rarity_modifiers)) {
+            return { type: baseMeta.type_modifiers || {}, rarity: baseMeta.rarity_modifiers || {} };
+        }
+        return null;
+    }
+
+    function equipmentModChips(item) {
+        const mods = equipmentModsFor(item);
+        if (!mods) return '';
+        const chips = [];
+        const typeEmoji = { fish: '🐟', trash: '🟤', treasure: '🪎', empty: '💨' };
+        for (const [key, value] of Object.entries(mods.type || {})) {
+            if (Number(value) === 1) continue;
+            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель типа «' + key + '»: ' + Math.round(Number(value) * 100) + '%')}">${esc((typeEmoji[key] || key) + '×' + Math.round(Number(value) * 100) + '%')}</span>`);
+        }
+        for (const [key, value] of Object.entries(mods.rarity || {})) {
+            if (Number(value) === 1) continue;
+            const icon = RARITY_EFFECT_ICONS[key] || '';
+            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель редкости «' + key + '»: ' + Math.round(Number(value) * 100) + '%')}">${esc(icon + '×' + Math.round(Number(value) * 100) + '%')}</span>`);
+        }
+        return chips.length ? `<div class="inv-effects">${chips.join('')}</div>` : '';
+    }
+
     function renderItemCard(item) {
         const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
         const rarity = RARITY[item.rarity] || RARITY.empty;
@@ -1207,6 +1249,7 @@
                 ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
                 ${artifactTypeBlock}
                 ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip" title="${esc(artifactEffectTooltip(effect, false))}">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
+                ${meta.equippable ? equipmentModChips(item) : ''}
                 ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
                 <div class="inv-actions">
                     ${action}
@@ -1497,7 +1540,7 @@
         const isArtifact = item.kind === 'artifact';
         const effectsBlock = isArtifact && Array.isArray(item.effects) && item.effects.length
             ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip" title="${esc(artifactEffectTooltip(effect, true))}">${esc(formatArtifactEffectRange(effect))}</span>`).join('')}</div>`
-            : '';
+            : (!isArtifact ? equipmentModChips(item) : '');
         const curseBlock = isArtifact && item.curseChance > 0
             ? `<div class="shop-curse">☠️ шанс проклятия: ${Math.round(item.curseChance * 100)}%</div>`
             : '';
@@ -1515,9 +1558,11 @@
                 <div class="inv-info-block">${esc(`Минимальный уровень: ${item.levelRequired}`)}</div>
                 ${effectsBlock}
                 ${curseBlock}
-                ${reason ? `<div class="shop-lock">${esc(reason)}</div>` : ''}
-                <div class="inv-actions">
-                    <button class="btn-admin primary" data-action="shop-buy" data-item="${esc(item.id)}" data-kind="${esc(item.kind)}"${reason ? ' disabled' : ''}>Купить</button>
+                <div class="shop-footer">
+                    ${reason ? `<div class="shop-lock">${esc(reason)}</div>` : ''}
+                    <div class="inv-actions">
+                        <button class="btn-admin primary" data-action="shop-buy" data-item="${esc(item.id)}" data-kind="${esc(item.kind)}"${reason ? ' disabled' : ''}>Купить</button>
+                    </div>
                 </div>
             </div>
         `;
@@ -1632,7 +1677,9 @@
             artifactType: row.artifact_type || null,
             effects: Array.isArray(row.effects) ? row.effects : [],
             curseEffects: Array.isArray(row.curse_effects) ? row.curse_effects : [],
-            curseChance: Number(row.curse_chance) || 0
+            curseChance: Number(row.curse_chance) || 0,
+            type_modifiers: row.type_modifiers || null,
+            rarity_modifiers: row.rarity_modifiers || null
         }));
 
         state.shopItemsByRarity.set(key, items);

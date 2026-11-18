@@ -1409,7 +1409,6 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
 
 #artifacts-grid,
 #loadout-grid {
-    justify-items: center;
     grid-template-columns: repeat(auto-fit, minmax(250px, 320px));
 }
 
@@ -2064,4 +2063,6 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
 
 .shop-item { height: 100%; }
 
-.shop-item .inv-actions { margin-top: auto; }
+.shop-item .shop-footer { margin-top: auto; display: flex; flex-direction: column; gap: 0.5rem; }
+
+.shop-item .inv-actions { margin-top: 0; }
