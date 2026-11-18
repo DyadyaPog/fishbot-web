@@ -1407,6 +1407,11 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     gap: 1rem;
 }
 
+#artifacts-grid {
+    justify-items: center;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 320px));
+}
+
 .inv-item {
     background: linear-gradient(180deg, var(--bg-glass-strong), var(--bg-glass));
     border: 1px solid var(--glass-border);
@@ -1536,6 +1541,14 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+}
+
+#artifacts .inv-effects {
+    justify-content: center;
+}
+
+#artifacts .inv-cursed {
+    text-align: center;
 }
 
 .shop-item .inv-effects {
