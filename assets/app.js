@@ -1116,6 +1116,44 @@
         }
     }
 
+    /* Понятное описание стата для тултипа (русский). range=true — диапазон возможных значений. */
+    function artifactEffectTooltip(effect, range) {
+        const typeTarget = (t) => ({ fish: 'рыбы', trash: 'мусора', treasure: 'сокровищ', empty: 'пустоты' }[t] || t);
+        const rarityTarget = (r) => RARITY_LABELS[r] || (LOOT_LABELS[r] && LOOT_LABELS[r].label) || r;
+        const pct = (v) => `${Math.round(Number(v) * 100)}%`;
+        const num = (v) => `${Number(v) >= 0 ? '+' : ''}${v}`;
+        if (range) {
+            const min = Number(effect.min), max = Number(effect.max);
+            const rngPct = min !== max ? `от ${pct(min)} до ${pct(max)}` : pct(min);
+            const rngNum = min !== max ? `от ${num(min)} до ${num(max)}` : num(min);
+            switch (effect.type) {
+                case 'type_modifier': return `Умножает шанс выпадения «${typeTarget(effect.target)}»: ${rngPct}`;
+                case 'rarity_modifier': return `Умножает шанс редкости «${rarityTarget(effect.target)}»: ${rngPct}`;
+                case 'rarity_bonus': return `Добавляет к весу редкости «${rarityTarget(effect.target)}»: ${rngNum}`;
+                case 'gold_bonus': return `Золото за заброс: ${rngNum} 💰`;
+                case 'xp_multiplier': return `Умножает получаемый опыт: ${rngPct}`;
+                case 'cooldown_modifier': return `Умножает кулдаун заброса: ${rngPct}`;
+                case 'bait_save_chance': return `Шанс не потратить наживку: ${rngPct}`;
+                case 'double_catch_chance': return `Шанс поймать двойной улов: ${rngPct}`;
+                case 'inventory_bonus': return `Слоты инвентаря: ${rngNum}`;
+                default: return String(effect.type);
+            }
+        }
+        const v = Number(effect.value);
+        switch (effect.type) {
+            case 'type_modifier': return `Умножает шанс выпадения «${typeTarget(effect.target)}» на ${pct(v)}`;
+            case 'rarity_modifier': return `Умножает шанс редкости «${rarityTarget(effect.target)}» на ${pct(v)}`;
+            case 'rarity_bonus': return `Добавляет ${num(v)} к весу редкости «${rarityTarget(effect.target)}»`;
+            case 'gold_bonus': return `${num(v)} 💰 за каждый заброс`;
+            case 'xp_multiplier': return `Умножает получаемый опыт на ${pct(v)}`;
+            case 'cooldown_modifier': return `Умножает кулдаун заброса на ${pct(v)}`;
+            case 'bait_save_chance': return `${pct(v)} шанс не потратить наживку`;
+            case 'double_catch_chance': return `${pct(v)} шанс поймать двойной улов`;
+            case 'inventory_bonus': return `${num(v)} слотов инвентаря`;
+            default: return String(effect.type);
+        }
+    }
+
     function renderItemCard(item) {
         const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
         const rarity = RARITY[item.rarity] || RARITY.empty;
@@ -1166,7 +1204,7 @@
                 ${priceBlock}
                 ${item.description ? `<div class="inv-description">${esc('📝 ' + item.description)}</div>` : ''}
                 ${artifactTypeBlock}
-                ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
+                ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip" title="${esc(artifactEffectTooltip(effect, false))}">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
                 ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
                 <div class="inv-actions">
                     ${action}
@@ -1456,7 +1494,7 @@
 
         const isArtifact = item.kind === 'artifact';
         const effectsBlock = isArtifact && Array.isArray(item.effects) && item.effects.length
-            ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffectRange(effect))}</span>`).join('')}</div>`
+            ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip" title="${esc(artifactEffectTooltip(effect, true))}">${esc(formatArtifactEffectRange(effect))}</span>`).join('')}</div>`
             : '';
         const curseBlock = isArtifact && item.curseChance > 0
             ? `<div class="shop-curse">☠️ шанс проклятия: ${Math.round(item.curseChance * 100)}%</div>`
