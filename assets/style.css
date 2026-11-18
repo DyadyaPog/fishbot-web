@@ -2017,8 +2017,6 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
 .shop-artifact-panel {
     margin: 1.5rem auto 0;
     width: 100%;
-    max-width: 640px;
-    min-width: 300px;
 }
 
 /* Заголовок панели: название и статус не слипаются. */
