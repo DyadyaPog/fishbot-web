@@ -1407,8 +1407,7 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     gap: 1rem;
 }
 
-#artifacts-grid,
-#artifact-shop-grid {
+#artifacts-grid {
     justify-items: center;
     grid-template-columns: repeat(auto-fit, minmax(250px, 320px));
 }
@@ -2017,8 +2016,8 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
 /* Магазин артефактов: панель не растягивается на всю ширину — ширина по содержимому, по центру. */
 .shop-artifact-panel {
     margin: 1.5rem auto 0;
-    width: fit-content;
-    max-width: 100%;
+    width: 100%;
+    max-width: 640px;
     min-width: 300px;
 }
 
