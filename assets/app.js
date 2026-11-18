@@ -2143,6 +2143,11 @@
         document.querySelectorAll('[data-filter]').forEach((select) => {
             select.addEventListener('change', () => setFilter(select.dataset.filter, select.value));
         });
+
+        const searchInput = el('filter-search');
+        if (searchInput) {
+            searchInput.addEventListener('input', () => setFilter('q', searchInput.value));
+        }
         el('inventory-grid').addEventListener('click', (event) => {
             const button = event.target.closest('[data-action="equip"], [data-action="unequip"]');
             if (!button || button.disabled) return;
