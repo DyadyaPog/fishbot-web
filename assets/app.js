@@ -940,8 +940,10 @@
             : '';
         const header = (caption) => `
             <div class="panel-header">
-                <div class="panel-title"><span class="panel-icon">🎯</span> Шансы улова</div>
-                <span class="chances-caption">${esc(caption)}</span>
+                <div class="panel-title-group">
+                    <div class="panel-title"><span class="panel-icon">🎯</span> Шансы улова</div>
+                    <span class="chances-caption">${esc(caption)}</span>
+                </div>
                 ${refreshButton}
             </div>
         `;

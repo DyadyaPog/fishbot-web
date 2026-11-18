@@ -1621,7 +1621,8 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
 
 /* Шансы улова на вкладке экипировки */
 .chances-panel { margin-top: 1.5rem; }
-.chances-caption { color: var(--text-dim); font-size: 0.72rem; }
+.panel-title-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.chances-caption { color: var(--text-dim); font-size: 0.72rem; font-style: italic; line-height: 1.2; }
 .chances-refresh { margin-left: auto; padding: 0.25rem 0.6rem; font-size: 0.72rem; border-radius: 6px; border: 1px solid var(--glass-border); background: rgba(255,255,255,0.04); color: var(--text); cursor: pointer; }
 .chances-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
 .chances-refresh:hover:not(:disabled) { background: rgba(255,255,255,0.08); }
