@@ -127,6 +127,15 @@ begin
         select 1 from information_schema.columns
          where table_schema = 'public'
            and table_name = 'items'
+           and column_name = 'image_path'
+    ) then
+        perform register_migration('29_fish_collection.sql');
+    end if;
+
+    if exists (
+        select 1 from information_schema.columns
+         where table_schema = 'public'
+           and table_name = 'items'
            and column_name = 'type_modifiers'
     ) then
         perform register_migration('27_equipment_modifiers.sql');

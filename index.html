@@ -30,6 +30,7 @@
             <li><button data-tab="profile" id="btn-profile" class="active"><span class="nav-icon">📊</span><span>Профиль</span></button></li>
             <li><button data-tab="inventory" id="btn-inventory"><span class="nav-icon">🎒</span><span>Инвентарь</span></button></li>
             <li><button data-tab="artifacts" id="btn-artifacts"><span class="nav-icon">🔮</span><span>Артефакты</span></button></li>
+            <li><button data-tab="collection" id="btn-collection"><span class="nav-icon">🐟</span><span>Коллекция</span></button></li>
             <li><button data-tab="shop" id="btn-shop"><span class="nav-icon">🛒</span><span>Магазин</span><span class="nav-badge" id="shop-badge" hidden>открыт</span></button></li>
             <li><button data-tab="loadout" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
             <li id="nav-refresh-data" hidden><button id="btn-refresh-data" data-action="refresh-all"><span class="nav-icon">↻</span><span>Обновить данные</span></button></li>
@@ -188,6 +189,14 @@
                 <span class="inventory-counter" id="artifacts-counter">0 артефактов</span>
             </div>
             <div id="artifacts-grid" class="inventory-grid"></div>
+        </section>
+
+        <!-- КОЛЛЕКЦИЯ -->
+        <section id="collection" class="tab-content">
+            <div class="collection-header">
+                <span class="inventory-counter" id="collection-progress">0 / 0</span>
+            </div>
+            <div id="collection-frames"></div>
         </section>
 
         <!-- МАГАЗИН -->

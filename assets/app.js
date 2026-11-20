@@ -100,6 +100,17 @@
         mythic: 'Мифическая'
     };
 
+    /* Демо-коллекция: небольшой набор рыб для показа без сети. */
+    const DEMO_FISH = [
+        { id: 'perch', name: 'Окунь', rarity: 'common', description: 'Обычная речная рыба.' },
+        { id: 'roach', name: 'Плотва', rarity: 'common', description: 'Мелкая, но частая.' },
+        { id: 'crucian', name: 'Карась', rarity: 'uncommon', description: 'Любит тихую воду.' },
+        { id: 'pike', name: 'Щука', rarity: 'rare', description: 'Хищник.' },
+        { id: 'catfish', name: 'Сом', rarity: 'epic', description: 'Крупный улов.' },
+        { id: 'sturgeon', name: 'Осётр', rarity: 'legendary', description: 'Редкий гость.' },
+        { id: 'golden_carp', name: 'Золотой карп', rarity: 'mythic', description: 'Мифическая рыба.' }
+    ];
+
     const ITEM_TYPES = {
         ROD: { label: 'Удочка', icon: '🎣', equippable: true },
         LINE: { label: 'Леска', icon: '🧵', equippable: true },
@@ -232,6 +243,7 @@
         profile: 'Профиль',
         inventory: 'Инвентарь',
         artifacts: 'Артефакты',
+        collection: 'Коллекция',
         shop: 'Магазин',
         loadout: 'Экипировка',
         rankings: 'Рейтинг'
@@ -311,6 +323,7 @@
                     const arr = JSON.parse(raw);
                     state.itemsCatalog = new Map((arr || []).map((x) => [String(x.id), {
                         name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description,
+                        image_path: x.image_path || null,
                         type_modifiers: x.type_modifiers || null, rarity_modifiers: x.rarity_modifiers || null
                     }]));
                     state.itemsCatalogLoaded = true;
@@ -323,10 +336,11 @@
                (25_items_public.sql), где только витринные колонки. */
             const { data, error } = await client
                 .from('items_public')
-                .select('id,name,rarity,price,kind,description,type_modifiers,rarity_modifiers');
+                .select('id,name,rarity,price,kind,description,image_path,type_modifiers,rarity_modifiers');
             if (error) throw error;
             state.itemsCatalog = new Map((data || []).map((x) => [String(x.id), {
                 name: x.name, rarity: x.rarity, price: x.price, kind: x.kind, description: x.description,
+                image_path: x.image_path || null,
                 type_modifiers: x.type_modifiers || null, rarity_modifiers: x.rarity_modifiers || null
             }]));
             state.itemsCatalogLoaded = true;
@@ -485,7 +499,8 @@
                 },
                 inventory: [],
                 catches: [],
-                ranking: []
+                ranking: [],
+                caughtFish: new Set()
             }));
 
             const saved = savedChannel();
@@ -645,6 +660,15 @@
                 at: relativeTime(row.caught_at)
             };
         });
+        /* Коллекция: какие рыбы игрок уже ловил на этом канале. */
+        try {
+            const caughtRes = await client.rpc('my_caught_fish_ids', { p_channel_id: Number(channelId) });
+            if (caughtRes.error) throw caughtRes.error;
+            channel.caughtFish = new Set((caughtRes.data || []).map((row) => String(row.item_id)));
+        } catch (caughtError) {
+            console.warn('my_caught_fish_ids:', caughtError && caughtError.message);
+            channel.caughtFish = channel.caughtFish || new Set();
+        }
         channel.ranking = (ranking.data || []).map((row, index) => ({
             username: row.username || '—',
             place: Number(row.place) || index + 1,
@@ -713,6 +737,8 @@
 
         if (name === 'shop') {
             openShopTab();
+        } else if (name === 'collection') {
+            renderCollection();
         } else if (name === 'inventory' || name === 'artifacts' || name === 'loadout') {
             refreshSellPrices();
         }
@@ -872,6 +898,174 @@
         }
 
         scheduleCatchesMinHeight();
+    }
+
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+
+    function fishImageUrl(item) {
+        if (!item) return '';
+        let path = item.image_path ? String(item.image_path) : `assets/fish-images/${item.id}.webp`;
+        if (!/[\/]/.test(path) && !/^https?:/i.test(path)) {
+            path = `assets/fish-images/${path}`;
+        }
+        if (/^https?:/i.test(path) || path.startsWith('/')) return path;
+        return path;
+    }
+
+    function renderCollection() {
+        const framesContainer = el('collection-frames');
+        const progress = el('collection-progress');
+        if (!framesContainer) return;
+
+        const channel = currentChannel();
+        const caught = (channel && channel.caughtFish) ? channel.caughtFish : new Set();
+
+        // Список рыб: из каталога (kind fish) или демо-набор.
+        let fishList = [];
+        if (state.demo) {
+            fishList = DEMO_FISH || [];
+        } else {
+            fishList = [...state.itemsCatalog.entries()]
+                .filter(([, v]) => String(v.kind || '').toLowerCase() === 'fish')
+                .map(([id, v]) => ({ id: String(id), ...v }));
+        }
+
+        // Группировка по редкости.
+        const groups = new Map();
+        RARITY_ORDER.forEach((r) => groups.set(r, []));
+        fishList.forEach((fish) => {
+            const r = String(fish.rarity || 'common').toLowerCase();
+            if (!groups.has(r)) groups.set(r, []);
+            groups.get(r).push(fish);
+        });
+
+        const total = fishList.length;
+        const caughtCount = fishList.filter((f) => caught.has(String(f.id))).length;
+        if (progress) progress.textContent = `${caughtCount} / ${total} поймано`;
+
+        const framesHtml = RARITY_ORDER
+            .filter((r) => (groups.get(r) || []).length > 0)
+            .map((rarityKey) => {
+                const items = groups.get(rarityKey) || [];
+                const rarityCaught = items.filter((f) => caught.has(String(f.id))).length;
+                const rarityInfo = RARITY[rarityKey] || RARITY.common;
+                const label = RARITY_LABELS[rarityKey] || rarityKey;
+                const cards = items.map((fish) => {
+                    const isCaught = caught.has(String(fish.id));
+                    if (isCaught) {
+                        const url = fishImageUrl(fish);
+                        const desc = fish.description ? `<div class="item-meta">${esc(fish.description)}</div>` : '';
+                        return `
+                            <div class="collection-card caught" style="--rarity-color:${rarityInfo.color}; border-left-color:${rarityInfo.color}">
+                                <div class="collection-img-wrap">
+                                    <img class="collection-img" data-src="${esc(url)}" alt="" loading="lazy" />
+                                </div>
+                                <div class="collection-name">${esc(fish.name || fish.id)}</div>
+                                ${desc}
+                            </div>
+                        `;
+                    }
+                    return `
+                        <div class="collection-card locked" style="--rarity-color:${rarityInfo.color}; border-left-color:${rarityInfo.color}">
+                            <div class="collection-img-wrap silhouette">
+                                <span class="collection-q">????</span>
+                            </div>
+                            <div class="collection-name">????</div>
+                        </div>
+                    `;
+                }).join('');
+                return `
+                    <div class="collection-frame" style="--rarity-color:${rarityInfo.color}">
+                        <div class="collection-frame-header">
+                            <span class="collection-frame-title" style="color:${rarityInfo.color}">${esc(label)}</span>
+                            <span class="collection-frame-count">${rarityCaught} / ${items.length}</span>
+                        </div>
+                        <div class="collection-grid">${cards}</div>
+                    </div>
+                `;
+            }).join('');
+
+        framesContainer.innerHTML = framesHtml || '<div class="empty-state">Коллекция пуста</div>';
+        initCollectionImages();
+    }
+
+    function initCollectionImages() {
+        const imgs = document.querySelectorAll('#collection-frames img.collection-img[data-src]');
+        if (!imgs.length) return;
+        const loadOne = (img) => {
+            const url = img.getAttribute('data-src');
+            if (!url || img.dataset.loaded) return;
+            img.dataset.loaded = '1';
+            (async () => {
+                let blob = await getCachedImage(url);
+                if (!blob) {
+                    try {
+                        const res = await fetch(url);
+                        if (!res.ok) throw new Error('img');
+                        blob = await res.blob();
+                        setCachedImage(url, blob);
+                    } catch (e) {
+                        img.classList.add('img-error');
+                        return;
+                    }
+                }
+                const objUrl = URL.createObjectURL(blob);
+                img.src = objUrl;
+                img.classList.add('img-loaded');
+            })();
+        };
+        if (!('IntersectionObserver' in window)) {
+            imgs.forEach(loadOne);
+            return;
+        }
+        if (window._collectionObserver) window._collectionObserver.disconnect();
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach((entry) => {
+                if (entry.isIntersecting) {
+                    loadOne(entry.target);
+                    observer.unobserve(entry.target);
+                }
+            });
+        }, { rootMargin: '200px' });
+        window._collectionObserver = observer;
+        imgs.forEach((img) => observer.observe(img));
+    }
+
+    // IndexedDB cache for fish images.
+    const FISH_IMAGE_DB = 'FishImageCache';
+    const FISH_IMAGE_STORE = 'images';
+    function openFishImageDB() {
+        return new Promise((resolve) => {
+            if (!('indexedDB' in window)) { resolve(null); return; }
+            const req = indexedDB.open(FISH_IMAGE_DB, 1);
+            req.onupgradeneeded = () => {
+                const db = req.result;
+                if (!db.objectStoreNames.contains(FISH_IMAGE_STORE)) db.createObjectStore(FISH_IMAGE_STORE);
+            };
+            req.onsuccess = () => resolve(req.result);
+            req.onerror = () => resolve(null);
+        });
+    }
+    async function getCachedImage(url) {
+        try {
+            const db = await openFishImageDB();
+            if (!db) return null;
+            return await new Promise((resolve) => {
+                const tx = db.transaction(FISH_IMAGE_STORE, 'readonly');
+                const store = tx.objectStore(FISH_IMAGE_STORE);
+                const r = store.get(url);
+                r.onsuccess = () => resolve(r.result || null);
+                r.onerror = () => resolve(null);
+            });
+        } catch (e) { return null; }
+    }
+    async function setCachedImage(url, blob) {
+        try {
+            const db = await openFishImageDB();
+            if (!db) return;
+            const tx = db.transaction(FISH_IMAGE_STORE, 'readwrite');
+            tx.objectStore(FISH_IMAGE_STORE).put(blob, url);
+        } catch (e) { /* ignore */ }
     }
 
     function renderLoadout() {
@@ -1811,6 +2005,7 @@
         renderProfile();
         renderInventory();
         renderArtifacts();
+        renderCollection();
         renderLoadout();
         renderRankings();
         renderShop();
@@ -1981,12 +2176,15 @@
     function startDemo() {
         state.demo = true;
         state.userId = null;
-        state.channels = clone(DEMO_CHANNELS).map((channel) => ({
+        state.channels = clone(DEMO_CHANNELS).map((channel, index) => ({
             ...channel,
-            inventory: channel.inventory.map((item, index) => ({
+            inventory: channel.inventory.map((item, i) => ({
                 ...item,
-                id: `${channel.id}-${index}`
-            }))
+                id: `${channel.id}-${i}`
+            })),
+            caughtFish: new Set(index === 0
+                                 ? ['perch', 'pike', 'golden_carp']
+                 : ['perch', 'roach'])
         }));
 
         const saved = savedChannel();
