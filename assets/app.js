@@ -1009,9 +1009,15 @@
                         return;
                     }
                 }
-                const objUrl = URL.createObjectURL(blob);
-                img.src = objUrl;
-                img.classList.add('img-loaded');
+                // CSP разрешает только 'self' и data:, поэтому blob: URL нельзя.
+                // Кэшированный Blob конвертируем в data: URL.
+                const reader = new FileReader();
+                reader.onload = () => {
+                    img.src = reader.result;
+                    img.classList.add('img-loaded');
+                };
+                reader.onerror = () => img.classList.add('img-error');
+                reader.readAsDataURL(blob);
             })();
         };
         if (!('IntersectionObserver' in window)) {
