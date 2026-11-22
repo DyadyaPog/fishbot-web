@@ -434,7 +434,13 @@
 
     function mapInventoryRow(row) {
         const item = itemMeta(row.item_id) || (row.items && typeof row.items === 'object' ? row.items : {});
-        const rawMeta = row.meta && typeof row.meta === 'object' ? row.meta : {};
+        const rawMeta = (row.meta && typeof row.meta === 'object')
+            ? row.meta
+            : (typeof row.meta === 'string' ? (function () { try { const p = JSON.parse(row.meta); return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {}; } catch (e) { return {}; } })() : {});
+        const metaEffects = rawMeta.effects;
+        const effects = Array.isArray(metaEffects)
+            ? metaEffects
+            : (typeof metaEffects === 'string' ? (function () { try { const p = JSON.parse(metaEffects); return Array.isArray(p) ? p : []; } catch (e) { return []; } })() : []);
         return {
             id: String(row.id),
             item_id: row.item_id,
@@ -454,7 +460,7 @@
                 : ((rawMeta.description != null && String(rawMeta.description).trim() !== '') ? String(rawMeta.description) : ''),
             /* Тип артефакта из meta (catch/treasure/luck/gold/comfort/mystic). */
             artifactType: rawMeta.type ? String(rawMeta.type) : null,
-            effects: (row.meta && typeof row.meta === 'object' && Array.isArray(row.meta.effects)) ? row.meta.effects : [],
+            effects: effects,
             cursed: (row.meta && typeof row.meta === 'object') ? Boolean(row.meta.cursed) : false,
             /* Модификаторы снаряжения: из справочника items, с fallback на meta. */
             type_modifiers: (item && item.type_modifiers) ? item.type_modifiers : (rawMeta.type_modifiers || null),
@@ -1944,8 +1950,8 @@
             levelRequired: Number(row.level_required) || 1,
             kind: row.kind,
             artifactType: row.artifact_type || null,
-            effects: Array.isArray(row.effects) ? row.effects : [],
-            curseEffects: Array.isArray(row.curse_effects) ? row.curse_effects : [],
+            effects: (function (v) { if (Array.isArray(v)) return v; if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; } } return []; })(row.effects),
+            curseEffects: (function (v) { if (Array.isArray(v)) return v; if (typeof v === 'string') { try { const p = JSON.parse(v); return Array.isArray(p) ? p : []; } catch (e) { return []; } } return []; })(row.curse_effects),
             curseChance: Number(row.curse_chance) || 0,
             type_modifiers: row.type_modifiers || null,
             rarity_modifiers: row.rarity_modifiers || null
