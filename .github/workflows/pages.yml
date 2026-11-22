@@ -38,14 +38,14 @@ jobs:
       - name: Inject Supabase config (optional)
         if: ${{ vars.SUPABASE_URL != '' && vars.SUPABASE_ANON_KEY != '' }}
         run: |
-          cat > config.js <<CONFIG
-          window.FISHBOT_CONFIG = {
-              supabaseUrl: '${{ vars.SUPABASE_URL }}',
-              supabaseAnonKey: '${{ vars.SUPABASE_ANON_KEY }}',
-              schemaVersion: 4,
-              imagesVersion: 3
-          };
-          CONFIG
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path('config.js')
+          s = p.read_text()
+          s = re.sub(r"supabaseUrl:\s*''", "supabaseUrl: '${{ vars.SUPABASE_URL }}'", s)
+          s = re.sub(r"supabaseAnonKey:\s*''", "supabaseAnonKey: '${{ vars.SUPABASE_ANON_KEY }}'", s)
+          p.write_text(s)
+          PY
 
       # Собираем чистый артефакт: только то, что должно быть доступно посетителю.
       - name: Stage site files
