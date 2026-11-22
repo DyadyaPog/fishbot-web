@@ -42,7 +42,8 @@ jobs:
           window.FISHBOT_CONFIG = {
               supabaseUrl: '${{ vars.SUPABASE_URL }}',
               supabaseAnonKey: '${{ vars.SUPABASE_ANON_KEY }}',
-              schemaVersion: 2
+              schemaVersion: 4,
+              imagesVersion: 3
           };
           CONFIG
 
