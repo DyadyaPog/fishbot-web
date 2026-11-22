@@ -8,11 +8,11 @@
 -- если в базе есть шаг новее.
 --
 -- Порядок запуска:
---   Новая (пустая) база:   00_schema_migrations.sql → 01…25 по порядку.
---   Начать с нуля:         00_reset_db.sql → 00 → 01…25.
+--   Новая (пустая) база:   00_schema_migrations.sql → 01…37 по порядку.
+--   Начать с нуля:         00_reset_db.sql → 00 → 01…37.
 --   База с ручными шагами: 00 → 00b_backfill_migrations.sql → только неотмеченные.
 --
--- На пустой базе 00b не нужен: 01…25 сами отметятся при первом запуске.
+-- На пустой базе 00b не нужен: 01…37 сами отметятся при первом запуске.
 -- Запускать в Supabase → SQL Editor. Скрипт идемпотентен.
 -- ============================================================================
 
@@ -65,12 +65,26 @@ insert into public.migration_order (idx, filename) values
     (28, '26_shop_items_effects.sql'),
     (29, '27_equipment_modifiers.sql'),
     (30, '28_shop_items_modifiers.sql'),
-    (31, '29_fish_collection.sql')
+    (31, '29_fish_collection.sql'),
+    (32, '30_hidden_sell_guard.sql'),
+    (33, '31_unique_fish_claims.sql'),
+    (34, '32_sell_bot_event.sql'),
+    (35, '33_drop_legacy_fields.sql'),
+    (36, '34_decrease_durability.sql'),
+    (37, '35_add_item_to_inventory.sql'),
+    (38, '36_update_balance_increment_stats.sql'),
+    (39, '37_get_inventory_with_prices.sql'),
+    (40, '38_extra_indexes.sql'),
+    (41, '39_record_catch.sql'),
+    (42, '40_record_catch_slim.sql'),
+    (43, '41_trim_indexes.sql'),
+    (44, '42_unique_fish_via_inventory.sql'),
+    (45, '43_drop_unique_fish_index.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Заглушки для следующих шагов: раскомментируйте и впишите имя файла, когда
 -- он появится. Файл, которого нет в списке, assert_migration не пропустит.
---   ,(29, '27_next_step.sql')
+--   ,(40, '38_next_step.sql')
 
 -- ---------------------------------------------------------------------------
 -- assert_migration(): «этот файл ещё не применяли и он не отстал от базы»

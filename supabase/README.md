@@ -37,6 +37,17 @@
 | 24 | `24_hardening.sql` | лимиты, журнал админки, RLS `shop_state`, рейтинг без Twitch ID, блокировки экипировки |
 | 25 | `25_items_public.sql` | вьюха `items_public`, таблица `items` закрыта |
 | 26 | `26_shop_items_effects.sql` | витрина `shop_items` отдаёт возможные статы артефактов |
+| 27 | `27_equipment_modifiers.sql` | модификаторы снаряжения в `items` |
+| 28 | `28_shop_items_modifiers.sql` | витрина отдаёт модификаторы снаряжения |
+| 29 | `29_fish_collection.sql` | коллекция рыб, `image_path`, `my_caught_fish_ids` |
+| 30 | `30_hidden_sell_guard.sql` | запрет продажи тайной рыбы в базе |
+| 31 | `31_unique_fish_claims.sql` | реестр занятых уникальных тегов рыбы |
+| 32 | `32_sell_bot_event.sql` | продажа из бота пишет одно агрегированное событие |
+| 33 | `33_drop_legacy_fields.sql` | удаление полей переноса из SQLite |
+| 34 | `34_decrease_durability.sql` | атомарный износ снаряжения |
+| 35 | `35_add_item_to_inventory.sql` | атомарная вставка предмета и claim уникальной рыбы |
+| 36 | `36_update_balance_increment_stats.sql` | атомарный баланс и статистика |
+| 37 | `37_get_inventory_with_prices.sql` | инвентарь вместе с ценами продажи |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -70,6 +81,17 @@
 24_hardening.sql
 25_items_public.sql
 26_shop_items_effects.sql
+27_equipment_modifiers.sql
+28_shop_items_modifiers.sql
+29_fish_collection.sql
+30_hidden_sell_guard.sql
+31_unique_fish_claims.sql
+32_sell_bot_event.sql
+33_drop_legacy_fields.sql
+34_decrease_durability.sql
+35_add_item_to_inventory.sql
+36_update_balance_increment_stats.sql
+37_get_inventory_with_prices.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
@@ -77,10 +99,10 @@
 
 ## Три ситуации
 
-**Новая (пустая) база.** `00` → `01…25` по порядку. `00b` не нужен.
+**Новая (пустая) база.** `00` → `01…37` по порядку. `00b` не нужен.
 
 **Решили начать с нуля.** Сначала `00_reset_db.sql` — он удаляет схему `public`
-со всем содержимым и возвращает ей права Supabase, потом `00` → `01…25`.
+со всем содержимым и возвращает ей права Supabase, потом `00` → `01…37`.
 Так база гарантированно соответствует файлам, без сверки того, что уже применено.
 Данные пропадут; аккаунты Supabase Auth (схема `auth`) остаются, но связка
 `accounts` (Twitch ID ↔ auth) создастся заново и её нужно будет заполнить входом в кабинет.
@@ -95,7 +117,7 @@
 иначе пропущенный шаг остался бы невыполненным, но закрытым от запуска.
 
 Если разбираться, какие шаги уже сделаны, не хочется — берите `00_reset_db.sql`
-и проходите `00` → `01…25` целиком.
+и проходите `00` → `01…37` целиком.
 
 ## Проверка после запуска
 
@@ -109,6 +131,22 @@ with checks(name, ok) as (values
     ('таблица accounts',                  to_regclass('public.accounts') is not null),
     ('таблица players',                   to_regclass('public.players') is not null),
     ('таблица inventory',                 to_regclass('public.inventory') is not null),
+    ('таблица unique_fish_claims',        to_regclass('public.unique_fish_claims') is not null),
+    ('триггер inventory_unique_fish_claim', exists (
+        select 1
+        from pg_trigger t
+        join pg_class c on c.oid = t.tgrelid
+        where c.relname = 'inventory'
+          and t.tgname = 'inventory_unique_fish_claim'
+          and not t.tgisinternal
+    )),
+    ('функция update_balance(...)',       to_regprocedure('public.update_balance(bigint,bigint,integer)') is not null),
+    ('функция increment_stats(...)',      to_regprocedure('public.increment_stats(bigint,bigint,integer,integer)') is not null),
+    ('функция add_item_to_inventory(...)', to_regprocedure('public.add_item_to_inventory(bigint,bigint,text,public.item_kind,integer,jsonb,text,boolean,boolean)') is not null),
+    ('функция decrease_durability(...)',  to_regprocedure('public.decrease_durability(bigint,bigint,boolean)') is not null),
+    ('функция get_inventory_with_prices(...)', to_regprocedure('public.get_inventory_with_prices(bigint,bigint)') is not null),
+    ('legacy_id удалён из inventory',     not exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'inventory' and column_name = 'legacy_id')),
     ('таблица catches',                   to_regclass('public.catches') is not null),
     ('таблица events',                    to_regclass('public.events') is not null),
     ('таблица player_chances',            to_regclass('public.player_chances') is not null),

@@ -945,8 +945,8 @@
         return `${path}?v=${IMAGES_VERSION}`;
     }
 
-    async function renderCollection() {
-        await ensureImageCacheVersion();
+    function renderCollection() {
+        ensureImageCacheVersion().catch(() => {});
         const framesContainer = el('collection-frames');
         const progress = el('collection-progress');
         if (!framesContainer) return;
@@ -1449,7 +1449,7 @@
         const mods = equipmentModsFor(item);
         if (!mods) return '';
         const chips = [];
-        const typeEmoji = { fish: '🐟', trash: '🟤', treasure: '  ', empty: '💨' };
+        const typeEmoji = { fish: '🐟', trash: '🟤', treasure: '🪎', empty: '💨' };
         for (const [key, value] of Object.entries(mods.type || {})) {
             const num = Number(value);
             if (!Number.isFinite(num) || num === 1) continue;
