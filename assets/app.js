@@ -22,6 +22,8 @@
     const ITEMS_CACHE_TTL = 60 * 60 * 1000;
     const MAX_CATCHES = 10;
     const MAX_RANKING = 25;
+    /* Общая версия набора картинок рыб (из config.js). Меняется при обновлении изображений. */
+    const IMAGES_VERSION = Number(CONFIG.imagesVersion) || 1;
 
     /* Типы предметов в базе строчные (enum item_kind), в интерфейсе — заглавные. */
     const ITEM_KIND_TO_TYPE = {
@@ -57,6 +59,7 @@
         epic: { icon: '🔮', color: 'var(--rarity-epic)' },
         legendary: { icon: '👑', color: 'var(--rarity-legendary)' },
         mythic: { icon: '🌌', color: 'var(--rarity-mythic)' },
+        hidden: { icon: '🌑', color: 'var(--rarity-hidden)', hidden: true },
         trash: { icon: '🗑️', color: 'var(--rarity-trash)' },
         treasure: { icon: '💰', color: 'var(--rarity-treasure)' },
         empty: { icon: '💨', color: 'var(--rarity-empty)' }
@@ -97,7 +100,8 @@
         rare: 'Редкая',
         epic: 'Эпическая',
         legendary: 'Легендарная',
-        mythic: 'Мифическая'
+        mythic: 'Мифическая',
+        hidden: 'Тайная'
     };
 
     /* Демо-коллекция: небольшой набор рыб для показа без сети. */
@@ -900,7 +904,35 @@
         scheduleCatchesMinHeight();
     }
 
-    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic'];
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic', 'hidden'];
+    const IMAGE_CACHE_VERSION_KEY = 'fishbot.images.version';
+    let imageCacheClearPromise = null;
+
+    async function ensureImageCacheVersion() {
+        if (imageCacheClearPromise) return imageCacheClearPromise;
+        imageCacheClearPromise = (async () => {
+            try {
+                const stored = (typeof localStorage !== 'undefined') ? localStorage.getItem(IMAGE_CACHE_VERSION_KEY) : null;
+                if (stored === String(IMAGES_VERSION)) return;
+                const db = await openFishImageDB();
+                if (db) {
+                    await new Promise((resolve) => {
+                        try {
+                            const tx = db.transaction(FISH_IMAGE_STORE, 'readwrite');
+                            const store = tx.objectStore(FISH_IMAGE_STORE);
+                            const req = store.clear();
+                            req.onsuccess = () => resolve();
+                            req.onerror = () => resolve();
+                        } catch (e) { resolve(); }
+                    });
+                }
+                if (typeof localStorage !== 'undefined') {
+                    localStorage.setItem(IMAGE_CACHE_VERSION_KEY, String(IMAGES_VERSION));
+                }
+            } catch (e) { /* ignore */ }
+        })();
+        return imageCacheClearPromise;
+    }
 
     function fishImageUrl(item) {
         if (!item) return '';
@@ -909,10 +941,12 @@
             path = `assets/fish-images/${path}`;
         }
         if (/^https?:/i.test(path) || path.startsWith('/')) return path;
-        return path;
+        // Общая версия картинок: меняет URL-ключ IndexedDB/HTTP-кэша без переименования файла.
+        return `${path}?v=${IMAGES_VERSION}`;
     }
 
-    function renderCollection() {
+    async function renderCollection() {
+        await ensureImageCacheVersion();
         const framesContainer = el('collection-frames');
         const progress = el('collection-progress');
         if (!framesContainer) return;
@@ -989,6 +1023,14 @@
         initCollectionImages();
     }
 
+    function showImageFallback(img) {
+        img.classList.add('img-error');
+        img.removeAttribute('src');
+        img.alt = '';
+        const wrap = img.closest('.collection-img-wrap');
+        if (wrap) wrap.classList.add('img-error-wrap');
+    }
+
     function initCollectionImages() {
         const imgs = document.querySelectorAll('#collection-frames img.collection-img[data-src]');
         if (!imgs.length) return;
@@ -1005,7 +1047,7 @@
                         blob = await res.blob();
                         setCachedImage(url, blob);
                     } catch (e) {
-                        img.classList.add('img-error');
+                        showImageFallback(img);
                         return;
                     }
                 }
@@ -1016,7 +1058,7 @@
                     img.src = reader.result;
                     img.classList.add('img-loaded');
                 };
-                reader.onerror = () => img.classList.add('img-error');
+                reader.onerror = () => showImageFallback(img);
                 reader.readAsDataURL(blob);
             })();
         };
@@ -1104,7 +1146,7 @@
                 <div class="slot-card filled">
                     <div class="slot-type">${meta.icon} ${meta.label}</div>
                     <div class="slot-name">${esc(item.name)}</div>
-                    <div class="slot-rarity" style="color:${rarity.color}">${esc(item.rarity)}</div>
+                    <div class="slot-rarity" style="color:${rarity.color}">${esc(RARITY_LABELS[item.rarity] || item.rarity)}</div>
                 </div>
             `;
         }).join('');
@@ -1174,7 +1216,7 @@
             .join('');
 
         const rarityRows = Object.keys(RARITY_LABELS)
-            .filter((key) => rarities && rarities[key] !== undefined)
+            .filter((key) => !RARITY[key]?.hidden && rarities && rarities[key] !== undefined)
             .map((key) => {
                 const info = RARITY[key] || RARITY.empty;
                 return chanceRow(RARITY_LABELS[key], info.icon, info.color, rarities[key]);
@@ -1361,22 +1403,44 @@
         }
     }
 
+    function parseModifiers(raw) {
+    if (!raw) return {};
+    if (typeof raw === 'string') {
+        try {
+            const parsed = JSON.parse(raw);
+            return (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) ? parsed : {};
+        } catch (e) {
+            return {};
+        }
+    }
+    return (typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+}
+
     function equipmentModsFor(item) {
         if (!item) return null;
         /* Сначала модификаторы самого предмета (демо-данные и shop_items),
            затем — справочник items_public (единственный источник истины). */
         if (item.type_modifiers || item.rarity_modifiers) {
-            return { type: item.type_modifiers || {}, rarity: item.rarity_modifiers || {} };
+            return {
+                type: parseModifiers(item.type_modifiers),
+                rarity: parseModifiers(item.rarity_modifiers)
+            };
         }
         const meta = itemMeta(item.item_id || item.id);
         if (meta && (meta.type_modifiers || meta.rarity_modifiers)) {
-            return { type: meta.type_modifiers || {}, rarity: meta.rarity_modifiers || {} };
+            return {
+                type: parseModifiers(meta.type_modifiers),
+                rarity: parseModifiers(meta.rarity_modifiers)
+            };
         }
         /* Fallback для строк с суффиксом: ищем базовый id в справочнике. */
         const id = String(item.item_id || item.id || '').replace(/_\d+$/, '');
         const baseMeta = itemMeta(id);
         if (baseMeta && (baseMeta.type_modifiers || baseMeta.rarity_modifiers)) {
-            return { type: baseMeta.type_modifiers || {}, rarity: baseMeta.rarity_modifiers || {} };
+            return {
+                type: parseModifiers(baseMeta.type_modifiers),
+                rarity: parseModifiers(baseMeta.rarity_modifiers)
+            };
         }
         return null;
     }
@@ -1385,15 +1449,17 @@
         const mods = equipmentModsFor(item);
         if (!mods) return '';
         const chips = [];
-        const typeEmoji = { fish: '🐟', trash: '🟤', treasure: '🪎', empty: '💨' };
+        const typeEmoji = { fish: '🐟', trash: '🟤', treasure: '  ', empty: '💨' };
         for (const [key, value] of Object.entries(mods.type || {})) {
-            if (Number(value) === 1) continue;
-            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель типа «' + key + '»: ' + Math.round(Number(value) * 100) + '%')}">${esc((typeEmoji[key] || key) + '×' + Math.round(Number(value) * 100) + '%')}</span>`);
+            const num = Number(value);
+            if (!Number.isFinite(num) || num === 1) continue;
+            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель типа «' + key + '»: ' + Math.round(num * 100) + '%')}">${esc((typeEmoji[key] || key) + '×' + Math.round(num * 100) + '%')}</span>`);
         }
         for (const [key, value] of Object.entries(mods.rarity || {})) {
-            if (Number(value) === 1) continue;
+            const num = Number(value);
+            if (!Number.isFinite(num) || num === 1) continue;
             const icon = RARITY_EFFECT_ICONS[key] || '';
-            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель редкости «' + key + '»: ' + Math.round(Number(value) * 100) + '%')}">${esc(icon + '×' + Math.round(Number(value) * 100) + '%')}</span>`);
+            chips.push(`<span class="inv-effect-chip" title="${esc('Множитель редкости «' + key + '»: ' + Math.round(num * 100) + '%')}">${esc(icon + '×' + Math.round(num * 100) + '%')}</span>`);
         }
         return chips.length ? `<div class="inv-effects">${chips.join('')}</div>` : '';
     }
@@ -1401,6 +1467,7 @@
     function renderItemCard(item) {
         const meta = ITEM_TYPES[item.item_type] || { label: item.item_type, icon: '❔', equippable: false };
         const rarity = RARITY[item.rarity] || RARITY.empty;
+        const isHidden = String(item.rarity || '').toLowerCase() === 'hidden';
         const id = String(item.id);
 
         const action = meta.equippable
@@ -1409,10 +1476,12 @@
                 : `<button class="btn-admin primary" data-action="equip" data-id="${esc(id)}">Экипировать</button>`)
             : '';
 
-        const sellTitle = item.is_equipped
-            ? 'Сначала снимите предмет'
-            : (item.cursed ? 'Проклятый артефакт продать нельзя' : 'Продать предмет');
-        const sellButton = `<button class="btn-admin" data-action="sell" data-id="${esc(id)}"${item.is_equipped || item.cursed ? ' disabled' : ''} title="${sellTitle}">Продать</button>`;
+        const sellTitle = isHidden
+            ? 'Тайную рыбу продать нельзя'
+            : (item.is_equipped
+                ? 'Сначала снимите предмет'
+                : (item.cursed ? 'Проклятый артефакт продать нельзя' : 'Продать предмет'));
+        const sellButton = `<button class="btn-admin" data-action="sell" data-id="${esc(id)}"${item.is_equipped || item.cursed || isHidden ? ' disabled' : ''} title="${sellTitle}">Продать</button>`;
         const cleanseButton = item.item_type === 'ARTIFACT' && item.cursed
             ? `<button class="btn-admin primary" data-action="cleanse" data-id="${esc(id)}" title="Снять проклятие: свиток очищения или гадалка за монеты">Очистить</button>`
             : '';
@@ -1421,7 +1490,7 @@
             : cleanseButton + sellButton;
 
         /* Цена — из RPC inventory_sell_prices, то есть ровно та, что выплатит sell_item. */
-        const hasSellPrice = item.sell_price != null && Number.isFinite(Number(item.sell_price));
+        const hasSellPrice = !isHidden && item.sell_price != null && Number.isFinite(Number(item.sell_price));
         const priceLabel = item.item_type === 'FISH' ? 'Цена' : 'Цена продажи';
         const priceBlock = hasSellPrice
             ? `<div class="inv-info-block">${esc(`${priceLabel}: ${formatMoney(item.sell_price)}`)}</div>`
@@ -1438,7 +1507,7 @@
                                             <div class="inv-icon">${meta.icon}</div>
                     <div class="inv-title">
                         <div class="inv-name">${esc(item.name)}</div>
-                        <div class="inv-rarity" style="color:${rarity.color}">${esc(item.rarity)} · ${meta.label}</div>
+                        <div class="inv-rarity" style="color:${rarity.color}">${esc(RARITY_LABELS[item.rarity] || item.rarity)} · ${meta.label}</div>
                     </div>
                     ${item.quantity > 1 ? `<div class="inv-qty">×${Number(item.quantity)}</div>` : ''}
                 </div>
@@ -1999,7 +2068,7 @@
             }
 
             if (Date.now() > shopPollAt) {
-                shopPollAt = Date.now() + 60000;
+                shopPollAt = Date.now() + 60 * 1000;
                 loadShopState();
             }
         }, 1000);
@@ -2148,6 +2217,10 @@
             toast('Проклятый артефакт продать нельзя');
             return;
         }
+        if (String(item.rarity || '').toLowerCase() === 'hidden') {
+            toast('Тайную рыбу продать нельзя');
+            return;
+        }
 
         const priceLabel = item.sell_price != null ? ` за ${formatMoney(item.sell_price)}` : '';
         if (!window.confirm(`Продать «${item.name}»${priceLabel}?`)) return;
@@ -2266,6 +2339,12 @@
         }
 
         unsubscribeShopState();
+
+        if (shopTicker) {
+            clearInterval(shopTicker);
+            shopTicker = null;
+        }
+        shopPollAt = 0;
 
         state.session = false;
         state.loaded = false;

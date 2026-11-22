@@ -28,6 +28,7 @@
     --rarity-epic: #a855f7;
     --rarity-legendary: #eab308;
     --rarity-mythic: #f472b6;
+    --rarity-hidden: #e2e8f0;
     --rarity-trash: #475569;
     --rarity-treasure: #fbbf24;
     --rarity-empty: #64748b;
@@ -471,6 +472,7 @@ body {
 .rarity-epic { border-left-color: var(--rarity-epic); }
 .rarity-legendary { border-left-color: var(--rarity-legendary); }
 .rarity-mythic { border-left-color: var(--rarity-mythic); }
+.rarity-hidden { border-left-color: var(--rarity-hidden); }
 .rarity-empty { border-left-color: var(--rarity-empty); }
 
 /* Tabs & Content */
@@ -2154,6 +2156,16 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
 
 .collection-img.img-loaded {
     opacity: 1;
+}
+
+.collection-img.img-error {
+    display: none;
+}
+
+.collection-img-wrap.img-error-wrap::after {
+    content: '🌑';
+    font-size: 2rem;
+    color: var(--text-muted);
 }
 
 .collection-img-wrap.silhouette {
