@@ -10,5 +10,5 @@ window.FISHBOT_CONFIG = {
     // Версия схемы данных: 4 — добавлена коллекция рыб (image_path, my_caught_fish_ids).
     schemaVersion: 4,
     // Общая версия набора картинок рыб: при обновлении изображений поднимайте это число.
-    imagesVersion: 4
+    imagesVersion: 5
 };
