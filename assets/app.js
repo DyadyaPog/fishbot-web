@@ -13,6 +13,8 @@
        одноразовый code на токен своим client_secret и отзывает его. В статике
        нет секрета, в браузере — токена; кабинет получает только ?badge=код. */
     const TWITCH_BADGE_URL = String(CONFIG.twitchBadgeUrl || '').trim();
+    /* Ник бота в Twitch, который показывается в кабинете рядом со статусом бота. */
+    const BOT_LOGIN = String(CONFIG.botLogin || '').trim();
 
     /* PKCE: токены не приходят в URL-фрагменте, обмен идёт по коду.
        Redirect URL в Supabase остаётся тем же, что и для implicit. */
@@ -1015,7 +1017,7 @@
 
         const details = [];
         if (channel) {
-            details.push(`@${esc(channel.login)}`);
+            details.push(`@${esc(BOT_LOGIN || channel.login)}`);
             if (status === 'active' && channel.joinedAt) {
                 details.push(`в чате с ${esc(formatDateTime(channel.joinedAt))}`);
             } else if (status === 'pending' && channel.requestedAt) {

@@ -11,6 +11,9 @@ window.FISHBOT_CONFIG = {
     // https://<project-ref>.supabase.co/functions/v1/twitch-badge.
     // Публичный адрес: client_secret и service_role живут в Supabase secrets.
     twitchBadgeUrl: '',
+    // Ник бота в Twitch (логин), который показывается в кабинете.
+    // Задаётся repository variable TWITCH_BOT_LOGIN в GitHub (инжектится в CI).
+    botLogin: '',
     // Версия схемы данных: 7 — авторизация бота и значок (badge_at, шаг 46).
     schemaVersion: 7,
     // Общая версия набора картинок рыб: при обновлении изображений поднимайте это число.

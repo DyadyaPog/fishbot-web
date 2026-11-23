@@ -61,6 +61,18 @@ jobs:
           p.write_text(s)
           PY
 
+      # Ник бота в Twitch (логин), который показывается в кабинете рядом со статусом бота.
+      - name: Inject bot login (optional)
+        if: ${{ vars.TWITCH_BOT_LOGIN != '' }}
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path('config.js')
+          s = p.read_text()
+          s = re.sub(r"botLogin:\s*''", "botLogin: '${{ vars.TWITCH_BOT_LOGIN }}'", s)
+          p.write_text(s)
+          PY
+
       # Собираем чистый артефакт: только то, что должно быть доступно посетителю.
       - name: Stage site files
         run: |
