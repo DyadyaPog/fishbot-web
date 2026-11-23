@@ -9,6 +9,11 @@
     const SUPABASE_ANON_KEY = String(CONFIG.supabaseAnonKey || '');
     const HAS_SDK = Boolean(window.supabase && typeof window.supabase.createClient === 'function');
     const SUPABASE_READY = Boolean(SUPABASE_URL && SUPABASE_ANON_KEY && HAS_SDK);
+    /* Авторизацию бота ведёт Edge Function: она начинает OAuth, сама меняет
+       одноразовый code на токен своим client_secret и отзывает его. В статике
+       нет секрета, в браузере — токена; кабинет получает только ?badge=код. */
+    const TWITCH_BADGE_URL = String(CONFIG.twitchBadgeUrl || '').trim();
+
     /* PKCE: токены не приходят в URL-фрагменте, обмен идёт по коду.
        Redirect URL в Supabase остаётся тем же, что и для implicit. */
     const client = SUPABASE_READY
@@ -41,6 +46,7 @@
         }
         return location.href.split('#')[0];
     }
+
 
     function shortError(error) {
         return String((error && error.message) || error || 'неизвестная ошибка').slice(0, 160);
@@ -226,6 +232,8 @@
         loaded: false,
         userId: null,
         username: '',
+        /* Подключение бота к своему каналу (шаг 46): статус из my_bot_channel. */
+        botChannel: null,
         filters: { type: 'all', rarity: 'all', q: '' },
         /* Локальный кэш справочника items (имя/редкость/цена/тип/описание). */
         itemsCatalog: new Map(),
@@ -250,7 +258,8 @@
         collection: 'Коллекция',
         shop: 'Магазин',
         loadout: 'Экипировка',
-        rankings: 'Рейтинг'
+        rankings: 'Рейтинг',
+        bot: 'Бот на канале'
     };
 
     /* Страницы магазина: те же шесть редкостей и тот же порядок, что в !shop бота. */
@@ -478,6 +487,10 @@
             const claim = await client.rpc('claim_profile');
             if (claim.error) throw claim.error;
             state.userId = claim.data == null ? null : String(claim.data);
+
+            /* Статус бота на своём канале. Ошибка RPC не ломает кабинет:
+               миграция 46 может быть ещё не применена. */
+            await loadBotChannel();
 
             /* Справочник items обновляем при авторизации (триггер). */
             await loadItemsCatalog(true);
@@ -726,7 +739,10 @@
     }
 
     function showTab(name) {
-        if (state.channels.length === 0) {
+        /* Вкладка бота не зависит от игровых каналов: стример может ни разу
+           не рыбачить и всё равно подключить бота к своему каналу. */
+        const sessionOnly = name === 'bot';
+        if (state.channels.length === 0 && !(sessionOnly && state.session)) {
             renderAuthOnly();
             toast('Сначала войдите через Twitch или включите демо-режим');
             return;
@@ -828,6 +844,229 @@
         el('btn-demo').textContent = state.demo
             ? 'Сбросить'
             : (state.session ? 'Обновить' : 'Демо-режим');
+    }
+
+    /* ---------------------------------------------------------------------
+       Бот на канале: стример сам ставит заявку и отключает бота.
+       Владельца проверяет база (шаг 46): строка channels берётся по Twitch ID
+       вошедшего, поэтому чужой канал через эти RPC не меняется.
+       --------------------------------------------------------------------- */
+
+    const BOT_STATUS = {
+        active: { text: 'Бот работает', icon: '🟢' },
+        pending: { text: 'Заявка отправлена', icon: '🕒' },
+        disabled: { text: 'Бот отключён', icon: '⚪️' }
+    };
+
+    /* ---------------------------------------------------------------------
+       Авторизация бота: Twitch показывает значок чат-бота только сообщениям,
+       отправленным приложением с app access token, если канал выдал
+       разрешение channel:bot (или бот — модератор). Вход через Supabase
+       такого права не даёт, поэтому стример проходит отдельную авторизацию
+       Twitch. Альтернатива — выдать боту модератора канала.
+       --------------------------------------------------------------------- */
+
+    /** Уводит на Edge Function: она начнёт OAuth и сама обработает возврат. */
+    function startBadgeAuthorization() {
+        if (!TWITCH_BADGE_URL) {
+            toast('Укажите twitchBadgeUrl в config.js — адрес Edge Function авторизации бота');
+            return;
+        }
+        location.assign(TWITCH_BADGE_URL);
+    }
+
+    /* Коды, с которыми Edge Function возвращает стримера в кабинет. */
+    const BADGE_RESULTS = {
+        ok: 'Бот авторизован: значок проверится на ближайшем сообщении, перезапускать бота не нужно.',
+        denied: 'Вы не авторизовали бота — значок чат-бота не включится.',
+        scope: 'Twitch не подтвердил channel:bot. Проверьте, что Edge Function использует Client ID приложения бота.',
+        state: 'Ответ Twitch не совпал с запросом. Попробуйте авторизовать бота ещё раз.',
+        nochannel: 'Сначала подключите бота к каналу — без этого авторизация не сохранится.',
+        expired: 'Ссылка авторизации устарела. Нажмите «Авторизовать бота» ещё раз.',
+        ratelimited: 'Слишком много попыток авторизации. Подождите несколько минут.',
+        error: 'Не удалось завершить авторизацию. Попробуйте ещё раз или посмотрите логи Edge Function.'
+    };
+
+    /**
+     * Возврат с Edge Function: ?badge=ok|denied|... В адресе только код
+     * результата — токен и code обмена сюда не доходят, поэтому его можно
+     * показать и сразу убрать из адреса.
+     */
+    async function finishBadgeAuthorization() {
+        const params = new URLSearchParams(location.search);
+        const result = params.get('badge');
+        if (!result) return;
+
+        params.delete('badge');
+        const query = params.toString();
+        try {
+            history.replaceState(null, '', `${location.pathname}${query ? `?${query}` : ''}${location.hash}`);
+        } catch (error) { /* адресная строка не критична */ }
+
+        if (result === 'ok') {
+            if (!client || !state.session) {
+                toast('Авторизация получена. Войдите через Twitch, чтобы увидеть статус значка.');
+                return;
+            }
+            await loadBotChannel();
+            renderBotChannel();
+        }
+
+        toast(BADGE_RESULTS[result] || BADGE_RESULTS.error);
+    }
+
+    async function loadBotChannel() {
+        if (!SUPABASE_READY || !state.session || state.demo) {
+            state.botChannel = null;
+            return;
+        }
+
+        try {
+            const { data, error } = await client.rpc('my_bot_channel');
+            if (error) throw error;
+            const row = Array.isArray(data) ? data[0] : data;
+            state.botChannel = row ? {
+                id: String(row.channel_id),
+                login: row.login || '',
+                displayName: row.display_name || row.login || '',
+                status: row.bot_status || 'disabled',
+                banned: Boolean(row.banned),
+                requestedAt: row.requested_at || null,
+                joinedAt: row.joined_at || null,
+                badgeRequestedAt: row.badge_requested_at || null,
+                badgeAt: row.badge_at || null
+            } : null;
+        } catch (error) {
+            console.warn('my_bot_channel:', shortError(error));
+            state.botChannel = null;
+        }
+    }
+
+    function renderBotChannel() {
+        const host = el('bot-channel-body');
+        const caption = el('bot-status-caption');
+        if (!host) return;
+
+        if (caption) caption.textContent = '';
+
+        /* Демо проверяем первым: он работает и без сессии, и с ней. */
+        if (state.demo) {
+            if (caption) caption.textContent = 'демо';
+            host.innerHTML = `
+                <p class="bot-channel-text">Демо-режим: здесь появится подключение бота.
+                В реальном кабинете заявка уходит в базу, а бот сам входит в чат вашего канала.</p>`;
+            return;
+        }
+
+        if (!state.session) {
+            if (caption) caption.textContent = 'нужен вход через Twitch';
+            host.innerHTML = `
+                <p class="bot-channel-text">Войдите через Twitch, чтобы подключить бота к своему каналу.
+                Право на канал проверяется по вашему Twitch ID — чужой канал подключить нельзя.</p>`;
+            return;
+        }
+
+        const channel = state.botChannel;
+        const status = channel ? channel.status : null;
+        /* Блокировка важнее статуса: бот вышел из чата и заявку не примет. */
+        const banned = Boolean(channel && channel.banned);
+        const meta = banned
+            ? { text: 'Подключение заблокировано', icon: '🚫' }
+            : (BOT_STATUS[status] || { text: 'Бот не подключён', icon: '⚪️' });
+        const isConnected = !banned && (status === 'active' || status === 'pending');
+        const badgeActive = Boolean(channel && channel.badgeAt);
+        const badgeRequested = Boolean(channel && channel.badgeRequestedAt);
+
+        const details = [];
+        if (channel) {
+            details.push(`@${esc(channel.login)}`);
+            if (status === 'active' && channel.joinedAt) {
+                details.push(`в чате с ${esc(formatDateTime(channel.joinedAt))}`);
+            } else if (status === 'pending' && channel.requestedAt) {
+                details.push(`заявка от ${esc(formatDateTime(channel.requestedAt))}`);
+            }
+        }
+
+        const text = banned
+            ? 'Владелец бота заблокировал подключение для этого канала. Если это ошибка — свяжитесь с ним: сам кабинет блокировку снять не может.'
+            : (status === 'active'
+                ? 'Бот входит в чат вашего канала и отвечает на команды игры.'
+                : (status === 'pending'
+                    ? 'Заявка в очереди: бот подключится сам в течение минуты, перезапускать его не нужно.'
+                    : 'Бот не подключён к вашему каналу. Подключите его — и он начнёт отвечать на команды в чате.'));
+
+        const button = banned
+            ? ''
+            : (isConnected
+                ? `<button class="btn-ghost" data-action="bot-disconnect">${status === 'pending' ? 'Отменить заявку' : 'Отключить бота'}</button>`
+                : '<button class="btn-twitch" data-action="bot-connect"><span>🤖</span><span>Подключить бота</span></button>');
+
+        const badgeTitle = badgeActive
+            ? '✅ Бот авторизован для значка'
+            : (badgeRequested ? '🕒 Проверяем авторизацию для значка' : '⚪️ Бот не авторизован для значка');
+        const badgeText = badgeActive
+            ? `Twitch подтвердил авторизацию ${formatDateTime(channel.badgeAt)}.`
+            : (badgeRequested
+                ? 'Бот проверит авторизацию на ближайшем сообщении после синхронизации (до минуты). Если значка нет, проверьте: Edge Function должна использовать Client ID приложения бота, а токен бота выдан с user:bot.'
+                : 'Авторизация даёт боту разрешение channel:bot — с ним Twitch показывает значок чат-бота. Обычный вход через Twitch такого права не даёт. Если бот уже модератор канала, отдельная авторизация не нужна.');
+        const badgeButton = badgeActive
+            ? ''
+            : (TWITCH_BADGE_URL
+                ? '<button class="btn-ghost" data-action="bot-badge">Авторизовать бота</button>'
+                : '<span class="bot-channel-login">Укажите twitchBadgeUrl в config.js</span>');
+        const badgeBlock = channel && !banned && isConnected
+            ? `<div class="bot-badge-block">
+                <div class="bot-badge-title">${esc(badgeTitle)}</div>
+                <p class="bot-channel-text">${esc(badgeText)}</p>
+                <div class="bot-channel-actions">${badgeButton}</div>
+            </div>`
+            : '';
+
+        host.innerHTML = `
+            <div class="bot-channel-head">
+                <span class="bot-channel-badge ${esc(banned ? 'disabled' : (status || 'disabled'))}">${meta.icon} ${esc(meta.text)}</span>
+                ${details.length ? `<span class="bot-channel-login">${details.join(' · ')}</span>` : ''}
+            </div>
+            <p class="bot-channel-text">${esc(text)}</p>
+            <div class="bot-channel-actions">${button}</div>
+            ${badgeBlock}
+            <ul class="bot-channel-hints">
+                <li>Отключение тоже действует в течение минуты. Баланс, инвентарь и уловы остаются на месте.</li>
+                <li>Значок можно включить и без авторизации: выдайте боту модератора канала —
+                    Twitch показывает значок чат-бота модераторам.</li>
+            </ul>`;
+    }
+
+    async function botChannelAction(method) {
+        if (!SUPABASE_READY) {
+            toast('Сначала укажите Supabase URL и anon key в config.js');
+            return;
+        }
+        if (!client || state.demo) return;
+
+        const button = document.querySelector('[data-action="bot-connect"], [data-action="bot-disconnect"]');
+        if (button) button.disabled = true;
+
+        try {
+            const { data, error } = await client.rpc(method);
+            if (error) throw error;
+
+            const status = data && typeof data === 'object' ? String(data.status || '') : '';
+            await loadBotChannel();
+            renderBotChannel();
+
+            if (method === 'disable_bot_channel') {
+                toast('Бот отключён от канала. Он выйдет из чата в течение минуты.');
+            } else if (status === 'active') {
+                toast('Бот уже работает на вашем канале.');
+            } else {
+                toast('Заявка отправлена: бот подключится к каналу в течение минуты.');
+            }
+        } catch (error) {
+            console.error(error);
+            toast(`Не удалось изменить подключение: ${shortError(error)}`);
+            if (button) button.disabled = false;
+        }
     }
 
     let catchHeightFrame = 0;
@@ -2083,6 +2322,7 @@
     function renderAll() {
         renderChannels();
         renderChip();
+        renderBotChannel();
         renderProfile();
         renderInventory();
         renderArtifacts();
@@ -2261,6 +2501,7 @@
     function startDemo() {
         state.demo = true;
         state.userId = null;
+        state.botChannel = null;
         state.channels = clone(DEMO_CHANNELS).map((channel, index) => ({
             ...channel,
             inventory: channel.inventory.map((item, i) => ({
@@ -2359,6 +2600,7 @@
         state.channels = [];
         state.channelId = null;
         state.username = '';
+        state.botChannel = null;
         state.shopState = new Map();
         state.shopAnnounced = new Map();
         state.shopWasOpen = false;
@@ -2438,10 +2680,12 @@
                 document.body.classList.remove('auth-pending');
                 setStatus('Гостевой режим', false);
                 renderAuthOnly();
+                await finishBadgeAuthorization();
                 return;
             }
             state.session = true;
             await loadPlayer();
+            await finishBadgeAuthorization();
         } catch (error) {
             console.error(error);
             setStatus('Гостевой режим', false);
@@ -2469,6 +2713,9 @@
             if (action.dataset.action === 'login') handleLogin();
             else if (action.dataset.action === 'demo') toggleDemo();
             else if (action.dataset.action === 'refresh-all') refreshAllData();
+            else if (action.dataset.action === 'bot-connect') botChannelAction('request_bot_channel');
+            else if (action.dataset.action === 'bot-disconnect') botChannelAction('disable_bot_channel');
+            else if (action.dataset.action === 'bot-badge') startBadgeAuthorization();
         });
 
         const channelSelect = el('channel-select');
@@ -2550,6 +2797,8 @@
             if (document.visibilityState !== 'visible') return;
             refreshSellPrices();
             loadShopState();
+            /* Статус бота меняет бот или админ-панель: обновляем при возврате. */
+            loadBotChannel().then(renderBotChannel);
         });
 
         window.addEventListener('resize', scheduleCatchesMinHeight);
@@ -2572,6 +2821,8 @@
         bind();
         renderChannels();
         renderRankings();
+        /* До входа вкладка бота объясняет, что нужен Twitch. */
+        renderBotChannel();
         /* Гостевой экран не показываем до проверки сессии. */
         setStatus('Проверка входа…', true);
         startSession();

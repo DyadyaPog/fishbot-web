@@ -48,6 +48,17 @@
 | 35 | `35_add_item_to_inventory.sql` | атомарная вставка предмета и claim уникальной рыбы |
 | 36 | `36_update_balance_increment_stats.sql` | атомарный баланс и статистика |
 | 37 | `37_get_inventory_with_prices.sql` | инвентарь вместе с ценами продажи |
+| 38 | `38_extra_indexes.sql` | дополнительные индексы под горячие запросы |
+| 39 | `39_record_catch.sql` | атомарная запись улова |
+| 40 | `40_record_catch_slim.sql` | упрощённый `record_catch`: статистика и журнал |
+| 41 | `41_trim_indexes.sql` | чистка неиспользуемых индексов |
+| 42 | `42_unique_fish_via_inventory.sql` | уникальные рыбы только в `inventory` |
+| 43 | `43_drop_unique_fish_index.sql` | удаление старого unique-индекса |
+| 44 | `44_artifact_roll_scalar_safe.sql` | ролл статов артефактов без падения на скалярах |
+| 45 | `45_jsonb_double_encode_fix.sql` | починка jsonb, записанного двойным кодированием |
+| 46 | `46_bot_access_and_hardening.sql` | объединённый шаг 46–50: стример подключает бота, админ-панель управляет каналом и баном, значок `channel:bot`, Twitch ID из `auth.identities`; кабинет читает из `channels` только публичные колонки |
+| 47 | `47_bot_badge_rpc_hardening.sql` | закрывает `request_bot_badge_access` для `authenticated`: bot_badge-поля пишет только `service_role` (Edge Function twitch-badge); кабинет теряет write-права на `channels` |
+| 48 | `48_bot_joined_at_cleanup.sql` | бан канала очищает `bot_joined_at`: после разблокировки кабинет не показывает старое время входа |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -92,17 +103,36 @@
 35_add_item_to_inventory.sql
 36_update_balance_increment_stats.sql
 37_get_inventory_with_prices.sql
+38_extra_indexes.sql
+39_record_catch.sql
+40_record_catch_slim.sql
+41_trim_indexes.sql
+42_unique_fish_via_inventory.sql
+43_drop_unique_fish_index.sql
+44_artifact_roll_scalar_safe.sql
+45_jsonb_double_encode_fix.sql
+46_bot_access_and_hardening.sql
+47_bot_badge_rpc_hardening.sql
+48_bot_joined_at_cleanup.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
 только при полном пересоздании, второй — только для базы с уже выполненными шагами.
 
+Шаг 46 объединяет бывшие отдельные шаги 46–50 (подключение бота, админ-блокировка,
+значок, `claim_profile` через `auth.identities` и колоночные гранты `channels`).
+Файлов с прежними именами 46–50 больше нет. Нумерация после 46 относится уже к
+новым шагам: 47 закрывает RPC значка, 48 очищает `bot_joined_at` при бане.
+Перед первым запуском перезапустите `00_schema_migrations.sql`: он зарегистрирует
+новые имена и уберёт из `migration_order` старые неприменённые записи, чтобы их
+нельзя было запустить по ошибке.
+
 ## Три ситуации
 
-**Новая (пустая) база.** `00` → `01…37` по порядку. `00b` не нужен.
+**Новая (пустая) база.** `00` → `01…48` по порядку. `00b` не нужен.
 
 **Решили начать с нуля.** Сначала `00_reset_db.sql` — он удаляет схему `public`
-со всем содержимым и возвращает ей права Supabase, потом `00` → `01…37`.
+со всем содержимым и возвращает ей права Supabase, потом `00` → `01…48`.
 Так база гарантированно соответствует файлам, без сверки того, что уже применено.
 Данные пропадут; аккаунты Supabase Auth (схема `auth`) остаются, но связка
 `accounts` (Twitch ID ↔ auth) создастся заново и её нужно будет заполнить входом в кабинет.
@@ -117,7 +147,7 @@
 иначе пропущенный шаг остался бы невыполненным, но закрытым от запуска.
 
 Если разбираться, какие шаги уже сделаны, не хочется — берите `00_reset_db.sql`
-и проходите `00` → `01…37` целиком.
+и проходите `00` → `01…46` целиком.
 
 ## Проверка после запуска
 
@@ -180,6 +210,23 @@ with checks(name, ok) as (values
     ('log_admin_action(...)',             to_regprocedure('public.log_admin_action(text,bigint,bigint,text,text,jsonb)') is not null),
     ('take_rate_limit(...)',              to_regprocedure('public.take_rate_limit(bigint,text,integer,interval)') is not null),
     ('request_chances_refresh(bigint)',   to_regprocedure('public.request_chances_refresh(bigint)') is not null),
+    ('my_bot_channel()',                  to_regprocedure('public.my_bot_channel()') is not null),
+    ('request_bot_channel()',             to_regprocedure('public.request_bot_channel()') is not null),
+    ('disable_bot_channel()',             to_regprocedure('public.disable_bot_channel()') is not null),
+    ('channels.bot_status',               exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'channels' and column_name = 'bot_status')),
+    ('channels.bot_banned',               exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'channels' and column_name = 'bot_banned')),
+    ('admin_set_bot_channel(...)',        to_regprocedure('public.admin_set_bot_channel(bigint,text,boolean)') is not null),
+    ('request_bot_badge_access закрыт для authenticated',
+        not has_function_privilege('authenticated', 'public.request_bot_badge_access()', 'execute')),
+    ('channels закрыт для записи authenticated',
+        not has_table_privilege('authenticated', 'public.channels', 'insert')
+        and not has_table_privilege('authenticated', 'public.channels', 'update')
+        and not has_table_privilege('authenticated', 'public.channels', 'delete')),
+    ('channels.bot_badge_at',             exists (select 1 from information_schema.columns
+        where table_schema = 'public' and table_name = 'channels' and column_name = 'bot_badge_at')),
+    ('request_bot_badge_access()',        to_regprocedure('public.request_bot_badge_access()') is not null),
 
     -- нет дублей перегрузок: иначе PostgREST не сможет выбрать функцию
     ('sell_item без перегрузок', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

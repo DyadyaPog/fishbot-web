@@ -47,6 +47,20 @@ jobs:
           p.write_text(s)
           PY
 
+      # Адрес Edge Function авторизации бота (channel:bot). Тоже необязателен:
+      # без него кабинет покажет подсказку вместо кнопки. Секретов в статике нет:
+      # client_secret и service_role живут только в Supabase secrets.
+      - name: Inject Twitch badge function URL (optional)
+        if: ${{ vars.TWITCH_BADGE_URL != '' }}
+        run: |
+          python3 - <<'PY'
+          import re, pathlib
+          p = pathlib.Path('config.js')
+          s = p.read_text()
+          s = re.sub(r"twitchBadgeUrl:\s*''", "twitchBadgeUrl: '${{ vars.TWITCH_BADGE_URL }}'", s)
+          p.write_text(s)
+          PY
+
       # Собираем чистый артефакт: только то, что должно быть доступно посетителю.
       - name: Stage site files
         run: |

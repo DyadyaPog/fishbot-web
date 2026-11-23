@@ -85,7 +85,12 @@ as $$
         jsonb_agg(artifact_roll_effect(effect) order by ord),
         '[]'::jsonb
     )
-    from jsonb_array_elements(coalesce(p_effects, '[]'::jsonb))
+    from jsonb_array_elements(
+        case when jsonb_typeof(coalesce(p_effects, '[]'::jsonb)) = 'array'
+             then coalesce(p_effects, '[]'::jsonb)
+             else '[]'::jsonb
+        end
+    )
          with ordinality as t(effect, ord);
 $$;
 
@@ -153,7 +158,12 @@ as $$
         ),
         '[]'::jsonb
     )
-    from jsonb_array_elements(coalesce(p_effects, '[]'::jsonb))
+    from jsonb_array_elements(
+        case when jsonb_typeof(coalesce(p_effects, '[]'::jsonb)) = 'array'
+             then coalesce(p_effects, '[]'::jsonb)
+             else '[]'::jsonb
+        end
+    )
          with ordinality as t(effect, ord)
     cross join lateral (select artifact_roll_effect(effect) as rolled) r;
 $$;

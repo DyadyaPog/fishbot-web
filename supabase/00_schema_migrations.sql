@@ -8,11 +8,11 @@
 -- если в базе есть шаг новее.
 --
 -- Порядок запуска:
---   Новая (пустая) база:   00_schema_migrations.sql → 01…37 по порядку.
---   Начать с нуля:         00_reset_db.sql → 00 → 01…37.
+--   Новая (пустая) база:   00_schema_migrations.sql → 01…46 по порядку.
+--   Начать с нуля:         00_reset_db.sql → 00 → 01…46.
 --   База с ручными шагами: 00 → 00b_backfill_migrations.sql → только неотмеченные.
 --
--- На пустой базе 00b не нужен: 01…37 сами отметятся при первом запуске.
+-- На пустой базе 00b не нужен: 01…46 сами отметятся при первом запуске.
 -- Запускать в Supabase → SQL Editor. Скрипт идемпотентен.
 -- ============================================================================
 
@@ -79,8 +79,28 @@ insert into public.migration_order (idx, filename) values
     (42, '40_record_catch_slim.sql'),
     (43, '41_trim_indexes.sql'),
     (44, '42_unique_fish_via_inventory.sql'),
-    (45, '43_drop_unique_fish_index.sql')
+    (45, '43_drop_unique_fish_index.sql'),
+    (46, '44_artifact_roll_scalar_safe.sql'),
+    (47, '45_jsonb_double_encode_fix.sql'),
+    (48, '46_bot_access_and_hardening.sql'),
+    (49, '47_bot_badge_rpc_hardening.sql'),
+    (50, '48_bot_joined_at_cleanup.sql')
 on conflict (idx) do update set filename = excluded.filename;
+
+-- Отдельные 46–50 больше не существуют: шаги объединены в 46. Убираем их из
+-- порядка, чтобы старый файл нельзя было случайно запустить после объединения.
+-- Уже отмеченные в schema_migrations записи не трогаем.
+delete from public.migration_order o
+ where o.filename in (
+     '46_streamer_bot_access.sql',
+     '47_bot_channel_admin.sql',
+     '48_bot_badge_access.sql',
+     '49_identity_provider_id.sql',
+     '50_channel_column_grants.sql'
+ )
+   and not exists (
+       select 1 from public.schema_migrations m where m.filename = o.filename
+   );
 
 -- Заглушки для следующих шагов: раскомментируйте и впишите имя файла, когда
 -- он появится. Файл, которого нет в списке, assert_migration не пропустит.

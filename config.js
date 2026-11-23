@@ -7,8 +7,12 @@
 window.FISHBOT_CONFIG = {
     supabaseUrl: '',
     supabaseAnonKey: '',
-    // Версия схемы данных: 4 — добавлена коллекция рыб (image_path, my_caught_fish_ids).
-    schemaVersion: 4,
+    // Адрес Edge Function, которая ведёт авторизацию бота для channel:bot:
+    // https://<project-ref>.supabase.co/functions/v1/twitch-badge.
+    // Публичный адрес: client_secret и service_role живут в Supabase secrets.
+    twitchBadgeUrl: '',
+    // Версия схемы данных: 7 — авторизация бота и значок (badge_at, шаг 46).
+    schemaVersion: 7,
     // Общая версия набора картинок рыб: при обновлении изображений поднимайте это число.
     imagesVersion: 5
 };
