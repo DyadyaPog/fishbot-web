@@ -872,7 +872,7 @@
     /** Уводит на Edge Function: она начнёт OAuth и сама обработает возврат. */
     function startBadgeAuthorization() {
         if (!TWITCH_BADGE_URL) {
-            toast('Укажите twitchBadgeUrl в config.js — адрес Edge Function авторизации бота');
+            toast('Авторизация бота временно недоступна.');
             return;
         }
         location.assign(TWITCH_BADGE_URL);
@@ -882,12 +882,12 @@
     const BADGE_RESULTS = {
         ok: 'Бот авторизован: значок бота проверится на ближайшем сообщении.',
         denied: 'Вы не авторизовали бота — значок чат-бота не включится.',
-        scope: 'Twitch не подтвердил channel:bot, обратитесь к администратору.',
+        scope: 'Twitch не подтвердил channel:bot. Попробуйте снова.',
         state: 'Ответ Twitch не совпал с запросом. Попробуйте авторизовать бота ещё раз.',
         nochannel: 'Сначала подключите бота к каналу — без этого авторизация не сохранится.',
         expired: 'Ссылка авторизации устарела. Нажмите «Авторизовать бота» ещё раз.',
         ratelimited: 'Слишком много попыток авторизации. Подождите несколько минут.',
-        error: 'Не удалось завершить авторизацию. При продолжающейся ошибке сообщите администратору.'
+        error: 'Не удалось завершить авторизацию. Попробуйте позже.'
     };
 
     /**
@@ -1045,13 +1045,13 @@
         const badgeText = badgeActive
             ? `Twitch подтвердил авторизацию ${formatDateTime(channel.badgeAt)}.`
             : (badgeRequested
-                ? 'Бот проверит авторизацию на ближайшем сообщении после синхронизации (до минуты). Если значка нет, сообщите администратору бота.'
+                ? 'Бот проверит авторизацию на ближайшем сообщении после синхронизации (до минуты). Если значка нет, свяжитесь с владельцем бота.'
                 : 'Авторизация даёт боту разрешение channel:bot — с ним Twitch показывает значок чат-бота. Обычный вход через Twitch такого права не даёт. Если бот уже модератор канала, отдельная авторизация не нужна.');
         const badgeButton = badgeActive
             ? ''
             : (TWITCH_BADGE_URL
                 ? '<button class="btn-ghost" data-action="bot-badge">Авторизовать бота</button>'
-                : '<span class="bot-channel-login">Укажите twitchBadgeUrl в config.js</span>');
+                : '<span class="bot-channel-login">Авторизация бота недоступна</span>');
         const badgeBlock = channel && !banned && isConnected
             ? `<div class="bot-badge-block">
                 <div class="bot-badge-title">${esc(badgeTitle)}</div>
@@ -1079,7 +1079,7 @@
 
     async function botChannelAction(method) {
         if (!SUPABASE_READY) {
-            toast('Сначала укажите Supabase URL и anon key в config.js');
+            toast('Кабинет временно недоступен. Попробуйте позже.');
             return;
         }
         if (!client || state.demo) return;
@@ -2682,7 +2682,7 @@
 
         if (!SUPABASE_READY) {
             el('setup-notice').hidden = false;
-            toast('Сначала укажите Supabase URL и anon key в config.js');
+            toast('Кабинет временно недоступен. Попробуйте позже.');
             return;
         }
 
