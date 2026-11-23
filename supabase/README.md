@@ -19,7 +19,7 @@
 | 6 | `06_inventory.sql` | инвентарь |
 | 7 | `07_catches.sql` | журнал уловов |
 | 8 | `08_events.sql` | события |
-| 9 | `09_views.sql` | `my_channels`, `channel_ranking` |
+| 9 | `09_views.sql` | `my_channels` |
 | 10 | `10_rls.sql` | RLS, `claim_profile`, `equip_item`/`unequip_item` |
 | 11 | `11_dashboard_stats.sql` | `get_dashboard_stats` |
 | 12 | `12_sell.sql` | продажа из кабинета |

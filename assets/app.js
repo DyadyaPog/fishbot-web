@@ -28,7 +28,6 @@
     const ITEMS_CACHE_AT_KEY = 'fishbot.items.catalog.at';
     const ITEMS_CACHE_TTL = 60 * 60 * 1000;
     const MAX_CATCHES = 10;
-    const MAX_RANKING = 25;
     /* Общая версия набора картинок рыб (из config.js). Меняется при обновлении изображений. */
     const IMAGES_VERSION = Number(CONFIG.imagesVersion) || 1;
 
@@ -168,11 +167,6 @@
                 { name: 'Старый сапог', rarity: 'trash', price: 3, at: '11 минут назад' },
                 { name: 'Сундук с монетами', rarity: 'treasure', price: 900, at: '18 минут назад' }
             ],
-            ranking: [
-                { username: 'night_angler', value: '18 400 💰' },
-                { username: 'DemoFisher', value: '1 250 💰' },
-                { username: 'quiet_pike', value: '980 💰' }
-            ],
             chances: {
                 types: { fish: '72.00%', trash: '10.00%', treasure: '8.00%', empty: '10.00%' },
                 rarities_if_fish: {
@@ -207,11 +201,6 @@
                 { name: 'Зеркальный карп', rarity: 'rare', price: 74, at: 'минуту назад' },
                 { name: 'Окунь', rarity: 'common', price: 9, at: '14 минут назад' },
                 { name: 'Ржавая банка', rarity: 'trash', price: 0, at: '26 минут назад' }
-            ],
-            ranking: [
-                { username: 'quiet_pike', value: '2 310 💰' },
-                { username: 'night_angler', value: '1 870 💰' },
-                { username: 'DemoFisher', value: '340 💰' }
             ],
             chances: {
                 types: { fish: '69.50%', trash: '10.90%', treasure: '5.60%', empty: '14.00%' },
@@ -261,7 +250,6 @@
         collection: 'Коллекция',
         shop: 'Магазин',
         loadout: 'Экипировка',
-        rankings: 'Рейтинг',
         bot: 'Бот на канале'
     };
 
@@ -525,7 +513,6 @@
                 },
                 inventory: [],
                 catches: [],
-                ranking: [],
                 caughtFish: new Set()
             }));
 
@@ -610,7 +597,7 @@
         refundTimer = setTimeout(refreshSellPrices, delay);
     }
 
-    /* Детали одного канала: инвентарь, последние уловы, рейтинг. */
+    /* Детали одного канала: инвентарь и последние уловы. */
     async function loadChannel(channelId) {
         const channel = state.channels.find((entry) => entry.id === String(channelId));
         if (!channel || !SUPABASE_READY || !state.userId) return;
@@ -621,7 +608,7 @@
             toast('Не удалось загрузить справочник предметов');
         }
 
-        const [inventory, catches, ranking, chances] = await Promise.all([
+        const [inventory, catches, chances] = await Promise.all([
             /* Справочник items подгружается отдельно и кэшируется локально,
                поэтому здесь только данные игрока — без join и без дублирования
                метаданных. */
@@ -637,11 +624,6 @@
                 .eq('user_id', state.userId)
                 .order('caught_at', { ascending: false })
                 .limit(MAX_CATCHES),
-            client.from('channel_ranking')
-                .select('username,balance,level,place')
-                .eq('channel_id', channelId)
-                .order('place', { ascending: true })
-                .limit(MAX_RANKING),
             /* Шансы — снимок расчёта бота. Таблица может быть ещё не создана
                или строки ещё нет: это не повод ломать загрузку канала. */
             client.from('player_chances')
@@ -651,13 +633,12 @@
                 .maybeSingle()
         ]);
 
-        const error = inventory.error || catches.error || ranking.error;
+        const error = inventory.error || catches.error;
         if (error) {
             console.error(error);
             /* Сбрасываем данные канала: иначе интерфейс покажет чужой канал как текущий. */
             channel.inventory = [];
             channel.catches = [];
-            channel.ranking = [];
             channel.loadError = shortError(error);
             toast(`Не удалось загрузить канал: ${shortError(error)}`);
             return;
@@ -695,12 +676,6 @@
             console.warn('my_caught_fish_ids:', caughtError && caughtError.message);
             channel.caughtFish = channel.caughtFish || new Set();
         }
-        channel.ranking = (ranking.data || []).map((row, index) => ({
-            username: row.username || '—',
-            place: Number(row.place) || index + 1,
-            value: formatMoney(row.balance),
-            level: Number(row.level) || 1
-        }));
     }
 
     /* Общее обновление: сбрасывает кэш справочника items и перезагружает
@@ -1857,26 +1832,6 @@
         grid.innerHTML = items.map(renderItemCard).join('');
     }
 
-    function renderRankings() {
-        const channel = currentChannel();
-        const rows = (channel && channel.ranking) || [];
-        const channelLabel = el('ranking-channel');
-        if (channelLabel) channelLabel.textContent = channel ? `· ${channel.displayName}` : '';
-
-        if (channel && channel.loadError) {
-            el('ranking-list').innerHTML = '<div class="empty-state">Рейтинг недоступен: канал не загрузился</div>';
-            return;
-        }
-
-        el('ranking-list').innerHTML = rows.map((row, index) => `
-            <div class="ranking-item">
-                <span class="rank">#${row.place || index + 1}</span>
-                <span class="name">${esc(row.username)}</span>
-                <span class="value">${esc(row.value)}</span>
-            </div>
-        `).join('');
-    }
-
     /* ---------- Магазин ---------- */
 
     function artifactShopUntil(channelId) {
@@ -2367,7 +2322,6 @@
         renderArtifacts();
         renderCollection();
         renderLoadout();
-        renderRankings();
         renderShop();
     }
 
@@ -2653,7 +2607,6 @@
         renderInventory();
         renderArtifacts();
         renderLoadout();
-        renderRankings();
         renderShop();
         toast('Вы вышли из аккаунта');
     }
@@ -2864,7 +2817,6 @@
     document.addEventListener('DOMContentLoaded', () => {
         bind();
         renderChannels();
-        renderRankings();
         /* До входа вкладка бота объясняет, что нужен Twitch. */
         renderBotChannel();
         /* Гостевой экран не показываем до проверки сессии. */
