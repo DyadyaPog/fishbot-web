@@ -33,6 +33,7 @@
             <li><button data-tab="collection" id="btn-collection"><span class="nav-icon">🐟</span><span>Коллекция</span></button></li>
             <li><button data-tab="shop" id="btn-shop"><span class="nav-icon">🛒</span><span>Магазин</span><span class="nav-badge" id="shop-badge" hidden>открыт</span></button></li>
             <li><button data-tab="loadout" id="btn-loadout"><span class="nav-icon">⚙️</span><span>Экипировка</span></button></li>
+            <li id="nav-feedback" hidden><button data-tab="feedback" id="btn-feedback"><span class="nav-icon">✉️</span><span>Отзыв</span></button></li>
             <li id="nav-refresh-data" hidden><button id="btn-refresh-data" data-action="refresh-all"><span class="nav-icon">↻</span><span>Обновить данные</span></button></li>
         </ul>
 
@@ -231,6 +232,31 @@
             <div class="slot-grid" id="slot-grid"></div>
             <div id="loadout-grid" class="inventory-grid"></div>
             <div id="chances-panel" class="chances-panel"></div>
+        </section>
+
+        <!-- ОТЗЫВ -->
+        <section id="feedback" class="tab-content">
+            <div class="dashboard-panel animate-up feedback-panel">
+                <div class="panel-header">
+                    <div class="panel-title"><span class="panel-icon">✉️</span> Отзыв о канале</div>
+                    <span class="chances-caption" id="feedback-channel-caption"></span>
+                </div>
+                <form class="feedback-form" id="feedback-form">
+                    <div class="form-group">
+                        <label class="form-label" for="feedback-message">Что понравилось или что стоит улучшить?</label>
+                        <textarea id="feedback-message" maxlength="500" rows="5" placeholder="Напишите отзыв: минимум 20 символов и 3 слова"></textarea>
+                    </div>
+                    <div class="feedback-meta">
+                        <span>Минимум 20 символов и 3 слова</span>
+                        <span class="feedback-counter" id="feedback-counter">0 / 500</span>
+                    </div>
+                    <div class="feedback-actions">
+                        <button class="btn-twitch" id="btn-feedback-submit" type="submit">Отправить отзыв</button>
+                        <span class="status-msg" id="feedback-status" role="status"></span>
+                    </div>
+                </form>
+                <div class="feedback-unavailable" id="feedback-unavailable" hidden></div>
+            </div>
         </section>
 
         <!-- БОТ НА КАНАЛЕ -->

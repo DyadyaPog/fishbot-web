@@ -60,8 +60,12 @@
 | 47 | `47_bot_badge_rpc_hardening.sql` | закрывает `request_bot_badge_access` для `authenticated`: bot_badge-поля пишет только `service_role` (Edge Function twitch-badge); кабинет теряет write-права на `channels` |
 | 48 | `48_bot_joined_at_cleanup.sql` | бан канала очищает `bot_joined_at`: после разблокировки кабинет не показывает старое время входа |
 | 49 | `49_bot_heartbeat.sql` | `bot_heartbeat` + RPC `bot_heartbeat()`: бот раз в две минуты отмечает, что запущен, кабинет показывает, на связи ли он |
+| 50 | `50_player_feedback.sql` | отзывы игроков: таблица `player_feedback`, RPC `submit_player_feedback` с проверкой автора, канала, длины и лимитов |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
+
+Если `00_schema_migrations.sql` уже применялся, для нового шага запустите его
+ещё раз: он добавит файл в `migration_order`, иначе `assert_migration` остановится.
 
 ```text
 00_schema_migrations.sql
@@ -116,6 +120,7 @@
 47_bot_badge_rpc_hardening.sql
 48_bot_joined_at_cleanup.sql
 49_bot_heartbeat.sql
+50_player_feedback.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
@@ -186,6 +191,7 @@ with checks(name, ok) as (values
     ('таблица shop_state',                to_regclass('public.shop_state') is not null),
     ('таблица rate_limits',               to_regclass('public.rate_limits') is not null),
     ('таблица admin_audit_log',           to_regclass('public.admin_audit_log') is not null),
+    ('таблица player_feedback',           to_regclass('public.player_feedback') is not null),
     ('вьюха my_channels',                 to_regclass('public.my_channels') is not null),
     ('вьюха channel_ranking',             to_regclass('public.channel_ranking') is not null),
     ('вьюха items_public',                to_regclass('public.items_public') is not null),
@@ -215,6 +221,7 @@ with checks(name, ok) as (values
     ('my_bot_channel()',                  to_regprocedure('public.my_bot_channel()') is not null),
     ('request_bot_channel()',             to_regprocedure('public.request_bot_channel()') is not null),
     ('disable_bot_channel()',             to_regprocedure('public.disable_bot_channel()') is not null),
+    ('submit_player_feedback(bigint,text)', to_regprocedure('public.submit_player_feedback(bigint,text)') is not null),
     ('channels.bot_status',               exists (select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'channels' and column_name = 'bot_status')),
     ('channels.bot_banned',               exists (select 1 from information_schema.columns
@@ -229,6 +236,8 @@ with checks(name, ok) as (values
     ('channels.bot_badge_at',             exists (select 1 from information_schema.columns
         where table_schema = 'public' and table_name = 'channels' and column_name = 'bot_badge_at')),
     ('request_bot_badge_access()',        to_regprocedure('public.request_bot_badge_access()') is not null),
+    ('submit_player_feedback закрыт для anon',
+        not has_function_privilege('anon', 'public.submit_player_feedback(bigint,text)', 'execute')),
 
     -- нет дублей перегрузок: иначе PostgREST не сможет выбрать функцию
     ('sell_item без перегрузок', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace

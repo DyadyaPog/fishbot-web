@@ -28,6 +28,9 @@
     const ITEMS_CACHE_AT_KEY = 'fishbot.items.catalog.at';
     const ITEMS_CACHE_TTL = 60 * 60 * 1000;
     const MAX_CATCHES = 10;
+    const FEEDBACK_MIN_CHARS = 20;
+    const FEEDBACK_MAX_CHARS = 500;
+    const FEEDBACK_MIN_WORDS = 3;
     /* Общая версия набора картинок рыб (из config.js). Меняется при обновлении изображений. */
     const IMAGES_VERSION = Number(CONFIG.imagesVersion) || 1;
 
@@ -250,6 +253,7 @@
         collection: 'Коллекция',
         shop: 'Магазин',
         loadout: 'Экипировка',
+        feedback: 'Отзыв',
         bot: 'Бот на канале'
     };
 
@@ -717,9 +721,9 @@
     }
 
     function showTab(name) {
-        /* Вкладка бота не зависит от игровых каналов: стример может ни разу
-           не рыбачить и всё равно подключить бота к своему каналу. */
-        const sessionOnly = name === 'bot';
+        /* Бот и отзыв доступны по одной сессии: стример может ни разу не
+           рыбачить и всё равно подключить бота, а зритель — оставить отзыв. */
+        const sessionOnly = name === 'bot' || name === 'feedback';
         if (state.channels.length === 0 && !(sessionOnly && state.session)) {
             renderAuthOnly();
             toast('Сначала войдите через Twitch или включите демо-режим');
@@ -743,6 +747,8 @@
             openShopTab();
         } else if (name === 'collection') {
             renderCollection();
+        } else if (name === 'feedback') {
+            renderFeedback();
         } else if (name === 'inventory' || name === 'artifacts' || name === 'loadout') {
             refreshSellPrices();
         }
@@ -812,6 +818,9 @@
 
         const refreshItem = el('nav-refresh-data');
         if (refreshItem) refreshItem.hidden = !(state.session && !state.demo);
+
+        const feedbackItem = el('nav-feedback');
+        if (feedbackItem) feedbackItem.hidden = !(state.session && !state.demo);
 
         const login = el('btn-login');
         if (state.demo || !state.session) {
@@ -2317,12 +2326,110 @@
         renderChannels();
         renderChip();
         renderBotChannel();
+        renderFeedback();
         renderProfile();
         renderInventory();
         renderArtifacts();
         renderCollection();
         renderLoadout();
         renderShop();
+    }
+
+    function feedbackWordCount(text) {
+        return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+    }
+
+    function updateFeedbackCounter() {
+        const input = el('feedback-message');
+        const counter = el('feedback-counter');
+        if (!input || !counter) return;
+        const length = input.value.length;
+        counter.textContent = `${length} / ${FEEDBACK_MAX_CHARS}`;
+        counter.classList.toggle('limit', length >= FEEDBACK_MAX_CHARS);
+    }
+
+    function renderFeedback() {
+        const channel = currentChannel();
+        const form = el('feedback-form');
+        const unavailable = el('feedback-unavailable');
+        const caption = el('feedback-channel-caption');
+        const allowed = Boolean(state.session && !state.demo && channel && SUPABASE_READY && client);
+
+        if (caption) caption.textContent = channel ? `Канал: ${channel.displayName}` : 'Канал не выбран';
+        if (form) form.hidden = !allowed;
+        if (unavailable) {
+            unavailable.hidden = allowed;
+            if (!allowed) {
+                unavailable.textContent = !state.session
+                    ? 'Отзыв можно оставить только после входа через Twitch.'
+                    : (!channel ? 'Сначала выберите канал, на котором играете.' : 'Отзыв сейчас недоступен.');
+            }
+        }
+        updateFeedbackCounter();
+    }
+
+    async function submitFeedback() {
+        const channel = currentChannel();
+        const input = el('feedback-message');
+        const status = el('feedback-status');
+        const button = el('btn-feedback-submit');
+        const message = String(input ? input.value : '').trim();
+
+        if (!state.session || state.demo) {
+            toast('Отзыв можно оставить только после входа через Twitch');
+            return;
+        }
+        if (!channel) {
+            toast('Сначала выберите канал');
+            return;
+        }
+        if (!message) {
+            toast('Напишите отзыв');
+            return;
+        }
+        if (message.length < FEEDBACK_MIN_CHARS) {
+            toast(`Отзыв слишком короткий: минимум ${FEEDBACK_MIN_CHARS} символов`);
+            return;
+        }
+        if (feedbackWordCount(message) < FEEDBACK_MIN_WORDS) {
+            toast(`Отзыв слишком короткий: нужно минимум ${FEEDBACK_MIN_WORDS} слова`);
+            return;
+        }
+        if (!SUPABASE_READY || !client) {
+            toast('Отзыв временно недоступен. Попробуйте позже.');
+            return;
+        }
+
+        if (button) button.disabled = true;
+        if (status) {
+            status.textContent = 'Отправляем…';
+            status.className = 'status-msg';
+        }
+
+        try {
+            const { error } = await client.rpc('submit_player_feedback', {
+                p_channel_id: Number(channel.id),
+                p_message: message
+            });
+            if (error) throw error;
+
+            if (input) input.value = '';
+            updateFeedbackCounter();
+            if (status) {
+                status.textContent = 'Отзыв отправлен. Спасибо!';
+                status.className = 'status-msg success';
+            }
+            toast('Спасибо! Отзыв отправлен.');
+        } catch (error) {
+            console.error(error);
+            if (status) {
+                status.textContent = shortError(error);
+                status.className = 'status-msg error';
+            }
+            toast(`Не удалось отправить отзыв: ${shortError(error)}`);
+        } finally {
+            if (button) button.disabled = false;
+        }
     }
 
     function setFilter(key, value) {
@@ -2723,6 +2830,17 @@
         if (searchInput) {
             searchInput.addEventListener('input', () => setFilter('q', searchInput.value));
         }
+
+        const feedbackForm = el('feedback-form');
+        if (feedbackForm) {
+            feedbackForm.addEventListener('submit', (event) => {
+                event.preventDefault();
+                submitFeedback();
+            });
+        }
+        const feedbackMessage = el('feedback-message');
+        if (feedbackMessage) feedbackMessage.addEventListener('input', updateFeedbackCounter);
+
         el('inventory-grid').addEventListener('click', (event) => {
             const button = event.target.closest('[data-action="equip"], [data-action="unequip"]');
             if (!button || button.disabled) return;

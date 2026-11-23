@@ -2295,3 +2295,58 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
     margin-right: 0.5rem;
     color: var(--accent-primary);
 }
+
+/* Player feedback */
+.feedback-panel {
+    max-width: 760px;
+}
+
+.feedback-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+    padding: 1.5rem;
+}
+
+.feedback-form[hidden] {
+    display: none;
+}
+
+.feedback-form textarea {
+    width: 100%;
+    min-height: 140px;
+    resize: vertical;
+    font-family: inherit;
+    font-size: 0.95rem;
+    line-height: 1.55;
+}
+
+.feedback-meta {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+}
+
+.feedback-counter.limit {
+    color: var(--warning);
+}
+
+.feedback-actions {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.feedback-actions .status-msg {
+    margin-top: 0;
+}
+
+.feedback-unavailable {
+    padding: 1.5rem;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
