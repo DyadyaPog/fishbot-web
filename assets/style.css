@@ -2256,6 +2256,18 @@ body.auth-pending #nav-refresh-data { visibility: hidden; }
     background: rgba(245, 158, 11, 0.1);
 }
 
+.bot-heartbeat {
+    display: inline-flex;
+    align-items: center;
+    color: var(--text-dim);
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.bot-heartbeat.online {
+    color: var(--success);
+}
+
 .bot-channel-login {
     color: var(--text-dim);
     font-size: 0.8rem;

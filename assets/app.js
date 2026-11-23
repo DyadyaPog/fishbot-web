@@ -234,6 +234,7 @@
         username: '',
         /* Подключение бота к своему каналу (шаг 46): статус из my_bot_channel. */
         botChannel: null,
+        botSeenAt: null,
         filters: { type: 'all', rarity: 'all', q: '' },
         /* Локальный кэш справочника items (имя/редкость/цена/тип/описание). */
         itemsCatalog: new Map(),
@@ -490,7 +491,7 @@
 
             /* Статус бота на своём канале. Ошибка RPC не ломает кабинет:
                миграция 46 может быть ещё не применена. */
-            await loadBotChannel();
+            await refreshBotChannel();
 
             /* Справочник items обновляем при авторизации (триггер). */
             await loadItemsCatalog(true);
@@ -877,14 +878,14 @@
 
     /* Коды, с которыми Edge Function возвращает стримера в кабинет. */
     const BADGE_RESULTS = {
-        ok: 'Бот авторизован: значок проверится на ближайшем сообщении, перезапускать бота не нужно.',
+        ok: 'Бот авторизован: значок бота проверится на ближайшем сообщении.',
         denied: 'Вы не авторизовали бота — значок чат-бота не включится.',
-        scope: 'Twitch не подтвердил channel:bot. Проверьте, что Edge Function использует Client ID приложения бота.',
+        scope: 'Twitch не подтвердил channel:bot, обратитесь к администратору.',
         state: 'Ответ Twitch не совпал с запросом. Попробуйте авторизовать бота ещё раз.',
         nochannel: 'Сначала подключите бота к каналу — без этого авторизация не сохранится.',
         expired: 'Ссылка авторизации устарела. Нажмите «Авторизовать бота» ещё раз.',
         ratelimited: 'Слишком много попыток авторизации. Подождите несколько минут.',
-        error: 'Не удалось завершить авторизацию. Попробуйте ещё раз или посмотрите логи Edge Function.'
+        error: 'Не удалось завершить авторизацию. При продолжающейся ошибке сообщите администратору.'
     };
 
     /**
@@ -905,11 +906,10 @@
 
         if (result === 'ok') {
             if (!client || !state.session) {
-                toast('Авторизация получена. Войдите через Twitch, чтобы увидеть статус значка.');
+                toast('Авторизация получена.');
                 return;
             }
-            await loadBotChannel();
-            renderBotChannel();
+            await refreshBotChannel();
         }
 
         toast(BADGE_RESULTS[result] || BADGE_RESULTS.error);
@@ -940,6 +940,42 @@
             console.warn('my_bot_channel:', shortError(error));
             state.botChannel = null;
         }
+    }
+
+    async function loadBotStatus() {
+        if (!SUPABASE_READY || state.demo) {
+            state.botSeenAt = null;
+            return;
+        }
+
+        try {
+            const { data, error } = await client.rpc('bot_heartbeat');
+            if (error) throw error;
+            const row = Array.isArray(data) ? data[0] : data;
+            state.botSeenAt = row && row.seen_at ? row.seen_at : null;
+        } catch (error) {
+            console.warn('bot_heartbeat:', shortError(error));
+            state.botSeenAt = null;
+        }
+    }
+
+    function renderBotStatus() {
+        const host = el('bot-heartbeat');
+        if (!host) return;
+
+        const seen = state.botSeenAt ? new Date(state.botSeenAt).getTime() : 0;
+        const online = Boolean(seen) && (Date.now() - seen < 5 * 60 * 1000);
+
+        host.className = `bot-heartbeat ${online ? 'online' : 'offline'}`;
+        host.textContent = online
+            ? '🟢 Бот на связи'
+            : (seen ? `⚪️ Бот не запущен · последний сигнал ${formatDateTime(state.botSeenAt)}` : '⚪️ Бот не запущен');
+    }
+
+    async function refreshBotChannel() {
+        await Promise.all([loadBotChannel(), loadBotStatus()]);
+        renderBotChannel();
+        renderBotStatus();
     }
 
     function renderBotChannel() {
@@ -1007,7 +1043,7 @@
         const badgeText = badgeActive
             ? `Twitch подтвердил авторизацию ${formatDateTime(channel.badgeAt)}.`
             : (badgeRequested
-                ? 'Бот проверит авторизацию на ближайшем сообщении после синхронизации (до минуты). Если значка нет, проверьте: Edge Function должна использовать Client ID приложения бота, а токен бота выдан с user:bot.'
+                ? 'Бот проверит авторизацию на ближайшем сообщении после синхронизации (до минуты). Если значка нет, сообщите администратору бота.'
                 : 'Авторизация даёт боту разрешение channel:bot — с ним Twitch показывает значок чат-бота. Обычный вход через Twitch такого права не даёт. Если бот уже модератор канала, отдельная авторизация не нужна.');
         const badgeButton = badgeActive
             ? ''
@@ -1025,6 +1061,7 @@
         host.innerHTML = `
             <div class="bot-channel-head">
                 <span class="bot-channel-badge ${esc(banned ? 'disabled' : (status || 'disabled'))}">${meta.icon} ${esc(meta.text)}</span>
+                <span id="bot-heartbeat" class="bot-heartbeat"></span>
                 ${details.length ? `<span class="bot-channel-login">${details.join(' · ')}</span>` : ''}
             </div>
             <p class="bot-channel-text">${esc(text)}</p>
@@ -1035,6 +1072,7 @@
                 <li>Значок можно включить и без авторизации: выдайте боту модератора канала —
                     Twitch показывает значок чат-бота модераторам.</li>
             </ul>`;
+        renderBotStatus();
     }
 
     async function botChannelAction(method) {
@@ -1052,8 +1090,7 @@
             if (error) throw error;
 
             const status = data && typeof data === 'object' ? String(data.status || '') : '';
-            await loadBotChannel();
-            renderBotChannel();
+            await refreshBotChannel();
 
             if (method === 'disable_bot_channel') {
                 toast('Бот отключён от канала. Он выйдет из чата в течение минуты.');
@@ -2798,8 +2835,14 @@
             refreshSellPrices();
             loadShopState();
             /* Статус бота меняет бот или админ-панель: обновляем при возврате. */
-            loadBotChannel().then(renderBotChannel);
+            refreshBotChannel();
         });
+
+        /* Бот пишет сигнал раз в две минуты: статус перечитываем без перезагрузки страницы. */
+        setInterval(() => {
+            if (document.visibilityState === 'hidden') return;
+            loadBotStatus().then(renderBotStatus);
+        }, 60 * 1000);
 
         window.addEventListener('resize', scheduleCatchesMinHeight);
         if (document.fonts && document.fonts.ready) {

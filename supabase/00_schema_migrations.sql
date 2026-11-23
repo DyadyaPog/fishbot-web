@@ -84,7 +84,8 @@ insert into public.migration_order (idx, filename) values
     (47, '45_jsonb_double_encode_fix.sql'),
     (48, '46_bot_access_and_hardening.sql'),
     (49, '47_bot_badge_rpc_hardening.sql'),
-    (50, '48_bot_joined_at_cleanup.sql')
+    (50, '48_bot_joined_at_cleanup.sql'),
+    (51, '49_bot_heartbeat.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Отдельные 46–50 больше не существуют: шаги объединены в 46. Убираем их из

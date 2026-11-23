@@ -59,6 +59,7 @@
 | 46 | `46_bot_access_and_hardening.sql` | объединённый шаг 46–50: стример подключает бота, админ-панель управляет каналом и баном, значок `channel:bot`, Twitch ID из `auth.identities`; кабинет читает из `channels` только публичные колонки |
 | 47 | `47_bot_badge_rpc_hardening.sql` | закрывает `request_bot_badge_access` для `authenticated`: bot_badge-поля пишет только `service_role` (Edge Function twitch-badge); кабинет теряет write-права на `channels` |
 | 48 | `48_bot_joined_at_cleanup.sql` | бан канала очищает `bot_joined_at`: после разблокировки кабинет не показывает старое время входа |
+| 49 | `49_bot_heartbeat.sql` | `bot_heartbeat` + RPC `bot_heartbeat()`: бот раз в две минуты отмечает, что запущен, кабинет показывает, на связи ли он |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -114,6 +115,7 @@
 46_bot_access_and_hardening.sql
 47_bot_badge_rpc_hardening.sql
 48_bot_joined_at_cleanup.sql
+49_bot_heartbeat.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
