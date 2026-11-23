@@ -259,40 +259,44 @@ async function handle(request: Request): Promise<Response> {
     if (!accessToken) return back('error');
 
     const scopes = Array.isArray(token?.scope) ? token.scope.map(String) : [];
-    if (!scopes.includes(SCOPE)) {
-        await revoke(accessToken, clientId);
-        return back('scope');
-    }
 
-    let broadcasterId = '';
+    /* Токен отзываем в finally: даже при неожиданном исключении он не
+       останется живым до истечения срока. */
     try {
-        const userResponse = await fetch(USERS_URL, {
-            headers: { 'Client-Id': clientId, Authorization: `Bearer ${accessToken}` }
-        });
-        if (userResponse.ok) {
-            const payload = (await userResponse.json()) as { data?: Array<{ id?: string }> };
-            broadcasterId = String(payload?.data?.[0]?.id || '');
+        if (!scopes.includes(SCOPE)) {
+            return back('scope');
         }
-    } catch (fetchError) {
-        console.warn('twitch-badge: helix/users недоступен', fetchError instanceof Error ? fetchError.message : fetchError);
-    }
 
-    /* Helix не дал ID — это не «канал не подключён», а сбой проверки. */
-    let result: 'ok' | 'nochannel' | 'error' = 'error';
-    if (/^\d+$/.test(broadcasterId)) {
+        let broadcasterId = '';
         try {
-            result = await markRequested(broadcasterId);
-        } catch (dbError) {
-            console.error('twitch-badge: запись в channels не удалась', dbError instanceof Error ? dbError.message : dbError);
+            const userResponse = await fetch(USERS_URL, {
+                headers: { 'Client-Id': clientId, Authorization: `Bearer ${accessToken}` }
+            });
+            if (userResponse.ok) {
+                const payload = (await userResponse.json()) as { data?: Array<{ id?: string }> };
+                broadcasterId = String(payload?.data?.[0]?.id || '');
+            }
+        } catch (fetchError) {
+            console.warn('twitch-badge: helix/users недоступен', fetchError instanceof Error ? fetchError.message : fetchError);
         }
+
+        /* Helix не дал ID — это не «канал не подключён», а сбой проверки. */
+        let result: 'ok' | 'nochannel' | 'error' = 'error';
+        if (/^\d+$/.test(broadcasterId)) {
+            try {
+                result = await markRequested(broadcasterId);
+            } catch (dbError) {
+                console.error('twitch-badge: запись в channels не удалась', dbError instanceof Error ? dbError.message : dbError);
+            }
+        }
+
+        if (result !== 'ok') return back(result);
+        console.log('twitch-badge: channel', broadcasterId, 'получил channel:bot');
+        return back('ok');
+    } finally {
+        /* Токен больше не нужен: отзываем до возврата в кабинет. */
+        await revoke(accessToken, clientId);
     }
-
-    /* Токен больше не нужен: отзываем до возврата в кабинет. */
-    await revoke(accessToken, clientId);
-
-    if (result !== 'ok') return back(result);
-    console.log('twitch-badge: channel', broadcasterId, 'получил channel:bot');
-    return back('ok');
 }
 
 Deno.serve(async (request: Request) => {
