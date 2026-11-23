@@ -1030,7 +1030,7 @@
             : (status === 'active'
                 ? 'Бот входит в чат вашего канала и отвечает на команды игры.'
                 : (status === 'pending'
-                    ? 'Заявка в очереди: бот подключится сам в течение минуты, перезапускать его не нужно.'
+                    ? 'Заявка в очереди: бот подключится сам в течение минуты.'
                     : 'Бот не подключён к вашему каналу. Подключите его — и он начнёт отвечать на команды в чате.'));
 
         const button = banned
@@ -1577,7 +1577,7 @@
         const percent = (v) => `${Math.round(Number(v) * 100)}%`;
         switch (effect && effect.type) {
             case 'type_modifier': {
-                const emoji = { fish: ' Joel ', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
+                const emoji = { fish: '🐟', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
                 return `${emoji}×${percent(value)}`;
             }
             case 'rarity_modifier':
@@ -1616,7 +1616,7 @@
         const rangeOf = (fmt) => isRange ? `${fmt(min)}…${fmt(max)}` : fmt(min);
         switch (effect && effect.type) {
             case 'type_modifier': {
-                const emoji = { fish: ' Joel ', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
+                const emoji = { fish: '🐟', trash: '🟤', treasure: '🪎', empty: '💨' }[effect.target] || '';
                 return `${emoji}×${rangeOf(percent)}`;
             }
             case 'rarity_modifier': {
@@ -2854,7 +2854,6 @@
         if (!SUPABASE_READY) el('setup-notice').hidden = false;
     }
 
-    // Inline-обработчики в index.html вызывают эти функции из глобальной области.
     window.showTab = showTab;
     window.toggleDemo = toggleDemo;
     window.handleLogin = handleLogin;
