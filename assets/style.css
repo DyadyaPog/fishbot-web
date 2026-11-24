@@ -81,7 +81,7 @@ body {
 .glow-2 { bottom: -10%; right: -10%; background: var(--accent-secondary); }
 .glow-3 { top: 40%; left: 30%; background: var(--accent-tertiary); width: 30vw; height: 30vw; opacity: 0.1; }
 
-/* Стабилизация шапки и логотипа, чтобы они не прыгали при смене вкладок */
+/* РЁР°РїРєР°, Р·Р°РіРѕР»РѕРІРѕРє Рё Р»РѕРіРѕС‚РёРї: С„РёРєСЃРёСЂРѕРІР°РЅРЅС‹Рµ СЂР°Р·РјРµСЂС‹, С‡С‚РѕР±С‹ РЅРµ РїСЂС‹РіР°Р»Рё РїСЂРё Р·Р°РіСЂСѓР·РєРµ */
 .main-header { min-height: 64px; }
 #page-title { line-height: 1.2; }
 .logo-container { min-height: 48px; }
@@ -1417,13 +1417,16 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
 
 .inventory-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(250px, 320px));
     gap: 1rem;
 }
 
-#artifacts-grid,
-#loadout-grid {
+#artifacts-grid {
     grid-template-columns: repeat(auto-fit, minmax(250px, 320px));
+}
+
+#loadout-grid {
+    grid-template-columns: repeat(auto-fill, minmax(250px, 320px));
 }
 
 .inv-item {
@@ -1515,6 +1518,7 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     letter-spacing: 0.01em;
     overflow-wrap: anywhere;
     word-break: break-word;
+    text-align: center;
 }
 
 .inv-description {
@@ -1529,12 +1533,14 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     font-style: italic;
     overflow-wrap: anywhere;
     word-break: break-word;
+    text-align: center;
 }
 
 .inv-cursed {
     color: #ff5a5a;
     font-size: 0.8rem;
     font-weight: 700;
+    text-align: center;
 }
 
 .inv-info-block {
@@ -1562,6 +1568,7 @@ td { padding: 1rem 1.25rem; border-bottom: 1px solid var(--glass-border); font-s
     display: flex;
     flex-wrap: wrap;
     gap: 0.4rem;
+    justify-content: center;
 }
 
 #artifacts .inv-effects {
