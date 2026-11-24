@@ -32,7 +32,7 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       # Если заданы repository variables, подставляем реальные адрес и ключ Supabase.
       # Без них страница публикуется с пустыми значениями и работает в демо-режиме.
@@ -87,7 +87,7 @@ jobs:
           test -f _site/assets/style.css
 
       - name: Configure Pages
-        uses: actions/configure-pages@v5
+        uses: actions/configure-pages@v6
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v5
@@ -97,4 +97,4 @@ jobs:
 
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v5
+        uses: actions/deploy-pages@v5.0.1
