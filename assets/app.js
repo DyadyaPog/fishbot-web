@@ -428,7 +428,7 @@
         if (meta.uses != null && meta.max_uses != null) parts.push(`Прочность: ${meta.uses}/${meta.max_uses}`);
         else if (meta.max_uses != null) parts.push(`Прочность: ${meta.max_uses}`);
         if (meta.weight != null && Number.isFinite(Number(meta.weight))) {
-            parts.push(`Вес: ${Number(meta.weight).toFixed(2)} кг`);
+            parts.push(`Вес: ${(Number(meta.weight) / 1000).toFixed(3)} кг`);
         }
         if (row.expires_at) parts.push(`Истекает: ${formatDateTime(row.expires_at)}`);
         if (!parts.length && ITEM_TYPES[type] && ITEM_TYPES[type].equippable) parts.push('Снаряжение');
@@ -1875,7 +1875,7 @@
 
     /* Читаем окно только своих каналов: чужие магазины кабинету не нужны. */
     async function loadShopState() {
-        if (!SUPABASE_READY || !client || state.demo) return;
+        if (!SUPABASE_READY || !client || state.demo || !state.session) return;
         const ids = state.channels
             .map((channel) => Number(channel.id))
             .filter((id) => Number.isFinite(id));
@@ -1895,7 +1895,7 @@
 
     /* Realtime: открытие магазина приходит без обновления страницы. */
     function subscribeShopState() {
-        if (!SUPABASE_READY || !client || state.demo || state.shopChannel) return;
+        if (!SUPABASE_READY || !client || state.demo || !state.session || state.shopChannel) return;
 
         try {
             state.shopChannel = client
