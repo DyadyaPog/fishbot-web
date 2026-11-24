@@ -1424,7 +1424,7 @@
        (!шансы) с учётом экипировки, артефактов и ручных настроек канала,
        поэтому кабинет ничего не пересчитывает и не расходится с чатом. */
     function chancePercent(value) {
-        const number = parseFloat(String(value == null ? '' : value).replace('%', '').replace(',', '.'));
+        const number = parseFloat(String(value == null ? '' : value).replace(/%/g, '').replace(/,/g, '.'));
         return Number.isFinite(number) ? number : 0;
     }
 
