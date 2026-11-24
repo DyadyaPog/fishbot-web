@@ -10,7 +10,8 @@
     <title>FishBot — Кабинет игрока</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=optional" as="style">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=optional" rel="stylesheet">
     <link rel="stylesheet" href="assets/style.css">
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ctext y='14' font-size='14'%3E%F0%9F%8E%A3%3C/text%3E%3C/svg%3E">
 </head>
@@ -42,8 +43,13 @@
             <li><button data-tab="bot" id="btn-bot"><span class="nav-icon">🤖</span><span>Бот на канале</span></button></li>
         </ul>
 
+        <div class="nav-section-label">Информация</div>
+        <ul class="nav-links">
+            <li><a href="help.html" class="nav-link"><span class="nav-icon">❓</span><span>Справка по кабинету</span></a></li>
+        </ul>
+
         <div class="sidebar-footer">
-            <div class="version-tag">player cabinet · pre-alpha</div>
+            <div class="version-tag" data-app-version>player cabinet · beta · v1.0.0</div>
         </div>
     </nav>
 
@@ -92,6 +98,7 @@
                         <span>🟣</span><span>Войти через Twitch</span>
                     </button>
                     <button class="btn-ghost" data-action="demo">Посмотреть демо</button>
+                    <a class="btn-ghost" href="help.html">Справка по кабинету</a>
                 </div>
             </div>
         </section>
@@ -276,6 +283,7 @@
     <!-- Версия supabase-js зафиксирована. При её обновлении пересчитайте integrity. -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/dist/umd/supabase.js" integrity="sha384-uteMfOloLDGt042uDz+xHGF3ym63/WQ6rFq7murQRG8Ih7QrXGEGNtWd8688sb4O" crossorigin="anonymous"></script>
     <script src="config.js"></script>
+    <script src="assets/version.js"></script>
     <script src="assets/app.js"></script>
 </body>
 </html>

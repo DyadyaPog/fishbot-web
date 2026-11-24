@@ -61,6 +61,9 @@
 | 48 | `48_bot_joined_at_cleanup.sql` | бан канала очищает `bot_joined_at`: после разблокировки кабинет не показывает старое время входа |
 | 49 | `49_bot_heartbeat.sql` | `bot_heartbeat` + RPC `bot_heartbeat()`: бот раз в две минуты отмечает, что запущен, кабинет показывает, на связи ли он |
 | 50 | `50_player_feedback.sql` | отзывы игроков: таблица `player_feedback`, RPC `submit_player_feedback` с проверкой автора, канала, длины и лимитов |
+| 51 | `51_extra_indexes.sql` | дополнительные индексы |
+| 52 | `52_fix_search_path.sql` | закрепление `search_path` для функций артефактов |
+| 53 | `53_bot_channel_default_blocked.sql` | новая заявка на бота по умолчанию заблокирована (включая существующие строки канала) |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -121,6 +124,9 @@
 48_bot_joined_at_cleanup.sql
 49_bot_heartbeat.sql
 50_player_feedback.sql
+51_extra_indexes.sql
+52_fix_search_path.sql
+53_bot_channel_default_blocked.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен

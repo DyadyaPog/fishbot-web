@@ -86,7 +86,10 @@ insert into public.migration_order (idx, filename) values
     (49, '47_bot_badge_rpc_hardening.sql'),
     (50, '48_bot_joined_at_cleanup.sql'),
     (51, '49_bot_heartbeat.sql'),
-    (52, '50_player_feedback.sql')
+    (52, '50_player_feedback.sql'),
+    (53, '51_extra_indexes.sql'),
+    (54, '52_fix_search_path.sql'),
+    (55, '53_bot_channel_default_blocked.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Отдельные 46–50 больше не существуют: шаги объединены в 46. Убираем их из

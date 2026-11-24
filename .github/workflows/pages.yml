@@ -9,6 +9,7 @@ on:
     branches: [main]
     paths:
       - 'index.html'
+      - 'help.html'
       - 'config.js'
       - 'assets/**'
       - '.github/workflows/pages.yml'
@@ -77,9 +78,10 @@ jobs:
       - name: Stage site files
         run: |
           mkdir -p _site
-          cp index.html config.js _site/
+          cp index.html help.html config.js _site/
           cp -r assets _site/
           test -f _site/index.html
+          test -f _site/help.html
           test -f _site/config.js
           test -f _site/assets/app.js
           test -f _site/assets/style.css
