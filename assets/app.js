@@ -1147,6 +1147,7 @@
         const catches = channel.catches || [];
 
         el('stat-balance').textContent = `${Number(player.balance || 0).toLocaleString('ru-RU')}`;
+        renderShopBalance();
         el('stat-level').textContent = player.level;
         el('stat-fish').textContent = Number(player.fishCaught || 0).toLocaleString('ru-RU');
 
@@ -2137,8 +2138,19 @@
         }).join('');
     }
 
+    /* Баланс в шапке магазина: то же число, что в профиле. */
+    function renderShopBalance() {
+        const node = el('shop-balance');
+        if (!node) return;
+        const channel = currentChannel();
+        node.textContent = channel
+            ? formatMoney(channel.player && channel.player.balance)
+            : '💰 —';
+    }
+
     /* Витрина снаряжения: артефакты живут в отдельном магазине ниже. */
     function renderShop() {
+        renderShopBalance();
         renderShopPages();
         renderShopNav();
         renderShopAlert();

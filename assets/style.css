@@ -2006,6 +2006,22 @@ body.auth-pending #page-title { visibility: hidden; }
 
 .notice-shop-action:hover { background: rgba(192, 132, 252, 0.32); }
 
+/* Баланс в шапке магазина: золото видно до любой покупки. */
+.shop-balance {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.45rem 0.9rem;
+    border-radius: 12px;
+    font-size: 1.05rem;
+    font-weight: 800;
+    color: #fde68a;
+    background: rgba(250, 204, 21, 0.12);
+    border: 1px solid rgba(250, 204, 21, 0.38);
+    box-shadow: 0 0 18px rgba(250, 204, 21, 0.12);
+    font-variant-numeric: tabular-nums;
+}
+
 /* Страницы редкости: те же шесть шагов, что в !shop. */
 .shop-pages {
     display: flex;
