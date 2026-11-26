@@ -230,6 +230,8 @@
         botChannel: null,
         botSeenAt: null,
         filters: { type: 'all', rarity: 'all', q: '' },
+        /* Массовая продажа уже идёт: защита от двойного клика. */
+        sellAllInFlight: false,
         /* Локальный кэш справочника items (имя/редкость/цена/тип/описание). */
         itemsCatalog: new Map(),
         itemsCatalogLoaded: false,
@@ -449,6 +451,9 @@
         return {
             id: String(row.id),
             item_id: row.item_id,
+            /* Исходный тип строки inventory: fish/treasure/trash. UI-тип ниже
+               сводит рыбу, мусор и сокровища к FISH. */
+            kind: String(row.item_type || '').toLowerCase(),
             item_type: uiType(row.item_type),
             name: item.name || row.item_id,
             rarity: item.rarity || 'common',
@@ -1807,6 +1812,8 @@
         const channel = currentChannel();
         const limit = inventoryLimitForLevel(channel && channel.player ? channel.player.level : 1);
 
+        updateSellAllButton();
+
         const counter = el('inventory-counter');
         if (counter) {
             counter.textContent = `занято ${occupied} из ${limit}`;
@@ -1822,6 +1829,35 @@
         }
 
         grid.innerHTML = items.map(renderItemCard).join('');
+    }
+
+    /* Массовая продажа повторяет !продать без аргументов: только рыба и
+       сокровища, без мусора, тайной рыбы, надетого и проклятого. */
+    function sellableLoot() {
+        return currentInventory().filter((item) => {
+            const kind = String(item.kind || '').toLowerCase();
+            if (kind) {
+                if (kind !== 'fish' && kind !== 'treasure') return false;
+            } else if (item.item_type !== 'FISH') {
+                return false;
+            }
+
+            const rarity = String(item.rarity || '').toLowerCase();
+            if (rarity === 'trash' || rarity === 'hidden') return false;
+            return !item.is_equipped && !item.cursed;
+        });
+    }
+
+    function updateSellAllButton(available = null) {
+        const button = el('sell-all-loot');
+        if (!button) return;
+        if (state.sellAllInFlight) {
+            button.disabled = true;
+            return;
+        }
+
+        const items = available === null ? sellableLoot() : available;
+        button.disabled = !currentChannel() || items.length === 0;
     }
 
     function renderArtifacts() {
@@ -2602,6 +2638,88 @@
         toast(`Продано: ${item.name} (+${formatMoney(data && data.gold)})`);
     }
 
+    /* Массовая продажа: каждая строка продаётся тем же RPC sell_item, поэтому
+       цена, владелец и запреты остаются на стороне базы. */
+    async function sellAllLoot() {
+        if (state.sellAllInFlight) return;
+
+        const channel = currentChannel();
+        if (!channel) return;
+
+        const items = sellableLoot();
+        if (items.length === 0) {
+            toast('Нет рыбы или сокровищ для продажи');
+            return;
+        }
+
+        if (state.demo) {
+            toast('Демо-режим: продажа недоступна');
+            return;
+        }
+        if (!client) return;
+
+        const count = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
+        const priced = items.every((item) => item.sell_price != null && Number.isFinite(Number(item.sell_price)));
+        const total = items.reduce((sum, item) => sum + (Number(item.sell_price) || 0), 0);
+        const priceLabel = priced ? ` на ${formatMoney(total)}` : '';
+        if (!window.confirm(`Продать всю рыбу и сокровища (${count} ${plural(count, 'предмет', 'предмета', 'предметов')})${priceLabel}?`)) return;
+
+        state.sellAllInFlight = true;
+        const button = el('sell-all-loot');
+        if (button) button.disabled = true;
+
+        let soldCount = 0;
+        let soldGold = 0;
+        let newBalance = null;
+        let failure = null;
+        try {
+            for (const item of items) {
+                const { data, error } = await client.rpc('sell_item', {
+                    p_inventory_id: Number(item.id),
+                    p_quantity: null
+                });
+
+                if (error) {
+                    failure = shortError(error);
+                    break;
+                }
+                if (!data || data.ok !== true) {
+                    failure = (data && data.message) || (data && data.error) || 'не удалось продать предмет';
+                    break;
+                }
+
+                soldCount += Number(data.quantity) || Number(item.quantity) || 1;
+                soldGold += Number(data.gold) || 0;
+                if (data.balance != null) newBalance = Number(data.balance) || 0;
+            }
+        } catch (error) {
+            console.error(error);
+            failure = shortError(error);
+        } finally {
+            state.sellAllInFlight = false;
+        }
+
+        if (newBalance != null) channel.player.balance = newBalance;
+
+        try {
+            await reloadInventory(channel.id);
+        } catch (error) {
+            console.error(error);
+        }
+        renderProfile();
+        renderInventory();
+        renderArtifacts();
+        renderLoadout();
+        updateSellAllButton();
+
+        if (soldCount > 0) {
+            const suffix = failure ? `. Остановлено: ${failure}` : '';
+            toast(`Продано ${soldCount} ${plural(soldCount, 'предмет', 'предмета', 'предметов')} на ${formatMoney(soldGold)}${suffix}`);
+        } else {
+            toast(`Не удалось продать: ${failure || 'неизвестная ошибка'}`);
+        }
+    }
+
     function startDemo() {
         state.demo = true;
         state.userId = null;
@@ -2864,6 +2982,12 @@
             const button = event.target.closest('[data-action="sell"]');
             if (!button || button.disabled) return;
             sellItem(button.dataset.id);
+        });
+
+        document.addEventListener('click', (event) => {
+            const button = event.target.closest('[data-action="sell-all-loot"]');
+            if (!button || button.disabled) return;
+            sellAllLoot();
         });
 
         document.addEventListener('click', (event) => {

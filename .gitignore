@@ -5,3 +5,5 @@ Thumbs.db
 
 # Временный артефакт локальной проверки workflow
 _site/
+/package-lock.json
+/package.json
