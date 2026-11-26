@@ -141,7 +141,8 @@ workflow подставит их в `config.js` при деплое. Перем�
     Страница передаёт свой текущий адрес в `redirectTo`; не попавший в этот список
     адрес подменяется на Site URL.
 - При первом входе `claim_profile()` связывает Twitch ID с `auth.users.id`; дальше
-  страница читает `my_channels`, `inventory`, `catches` под RLS.
+  страница читает `my_channels`, `inventory`, `catches` под RLS; коллекция рыб —
+  по истории уловов через `my_caught_fish_ids`.
 - RLS: игрок читает только свои строки; экипировка — через RPC `equip_item` /
   `unequip_item` с проверкой владельца.
 - `shop_state` виден только по своим каналам: чужое окно магазина не отдаётся.

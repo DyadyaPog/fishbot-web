@@ -27,8 +27,6 @@ create table if not exists inventory (
     origin_event_id text,
     -- Срок годности наживки и расходников из старой базы.
     expires_at      timestamptz,
-    -- id строки в SQLite: ключ повторного переноса, в вебе не используется.
-    legacy_id       bigint,
     created_at      timestamptz not null default now(),
     updated_at      timestamptz not null default now(),
     constraint inventory_player_fk
@@ -37,10 +35,9 @@ create table if not exists inventory (
         on delete cascade
 );
 
--- Догоняем колонки, если таблица была создана до появления переноса.
+-- Догоняем колонки, если таблица создана более ранней версией шага.
 alter table inventory add column if not exists origin_event_id text;
 alter table inventory add column if not exists expires_at      timestamptz;
-alter table inventory add column if not exists legacy_id       bigint;
 alter table inventory add column if not exists updated_at      timestamptz not null default now();
 
 comment on table inventory is
@@ -61,8 +58,6 @@ end $$;
 
 comment on column inventory.origin_event_id is
     'id сообщения Twitch (UUID), которым получен предмет; не ссылка на events.id.';
-comment on column inventory.legacy_id is
-    'id из inventory SQLite. Уникален в паре с channel_id, обеспечивает повторный перенос без дублей.';
 
 -- Все предметы игрока на канале.
 create index if not exists idx_inventory_player
@@ -73,10 +68,6 @@ create index if not exists idx_inventory_player
 create unique index if not exists uq_inventory_equipped
     on inventory (channel_id, user_id, item_type)
     where is_equipped;
-
--- Ключ повторного переноса из SQLite.
-create unique index if not exists uq_inventory_legacy
-    on inventory (channel_id, legacy_id);
 
 -- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
 select register_migration('06_inventory.sql');

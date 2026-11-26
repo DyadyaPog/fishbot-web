@@ -6,7 +6,7 @@ select assert_migration('07_catches.sql');
 --
 -- Строка = один выловленный предмет на канале. Название, редкость и вид берутся
 -- из items; здесь только то, что относится к конкретному улову: цена продажи,
--- время и игрок. legacy_id — id из SQLite, чтобы перенос можно было повторить.
+-- время и игрок. Счётчики уловов живут в player_catch_history (шаг 60).
 --
 -- Запускать в Supabase → SQL Editor. Скрипт идемпотентен.
 -- ============================================================================
@@ -18,15 +18,11 @@ create table if not exists catches (
     item_id     text        not null references items (id),
     price       integer     not null default 0,
     caught_at   timestamptz not null default now(),
-    legacy_id   bigint,
     constraint catches_player_fk
         foreign key (channel_id, user_id)
         references players (channel_id, user_id)
-        on delete cascade,
-    constraint catches_legacy_key unique (channel_id, legacy_id)
+        on delete cascade
 );
-
-alter table catches add column if not exists legacy_id bigint;
 
 comment on table catches is
     'Журнал уловов по каналам. Вид и редкость — в items, цена — фактическая цена улова.';

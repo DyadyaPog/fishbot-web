@@ -21,49 +21,36 @@
 | 8 | `08_events.sql` | события |
 | 9 | `09_views.sql` | `my_channels` |
 | 10 | `10_rls.sql` | RLS, `claim_profile`, `equip_item`/`unequip_item` |
-| 11 | `11_dashboard_stats.sql` | `get_dashboard_stats` |
-| 12 | `12_sell.sql` | продажа из кабинета |
 | 13 | `13_chances.sql` | `player_chances` |
 | 14 | `14_chances_refresh.sql` | запросы на пересчёт шансов |
 | 15 | `15_artifact_cleanse.sql` | каталог артефактов и очистка |
 | 16 | `16_artifact_catalog_grants.sql` | права на каталог (повторяемый) |
-| 17 | `17_buy_artifact.sql` | покупка артефакта |
 | 18 | `18_admin_grant_artifact.sql` | админская выдача артефакта |
-| 19 | `19_shop_items.sql` | витрина `shop_items` |
 | 20 | `20_buy_item.sql` | покупка снаряжения, выдача предметов |
 | 21 | `21_repair.sql` | ремонт снаряжения |
-| 22 | `22_sell_quantity.sql` | продажа с количеством, цены для `!bag` |
-| 23 | `23_shop_state.sql` | окно магазина артефактов, гейт в `buy_artifact` |
+| 23 | `23_shop_state.sql` | окно магазина артефактов и покупка: `buy_artifact_impl` + гейт в `buy_artifact` |
 | 24 | `24_hardening.sql` | лимиты, журнал админки, RLS `shop_state`, рейтинг без Twitch ID, блокировки экипировки |
 | 25 | `25_items_public.sql` | вьюха `items_public`, таблица `items` закрыта |
-| 26 | `26_shop_items_effects.sql` | витрина `shop_items` отдаёт возможные статы артефактов |
 | 27 | `27_equipment_modifiers.sql` | модификаторы снаряжения в `items` |
 | 28 | `28_shop_items_modifiers.sql` | витрина отдаёт модификаторы снаряжения |
-| 29 | `29_fish_collection.sql` | коллекция рыб, `image_path`, `my_caught_fish_ids` |
-| 30 | `30_hidden_sell_guard.sql` | запрет продажи тайной рыбы в базе |
-| 31 | `31_unique_fish_claims.sql` | реестр занятых уникальных тегов рыбы |
-| 32 | `32_sell_bot_event.sql` | продажа из бота пишет одно агрегированное событие |
-| 33 | `33_drop_legacy_fields.sql` | удаление полей переноса из SQLite |
-| 34 | `34_decrease_durability.sql` | атомарный износ снаряжения |
-| 35 | `35_add_item_to_inventory.sql` | атомарная вставка предмета и claim уникальной рыбы |
+| 29 | `29_fish_collection.sql` | `image_path` в `items` и вьюхе `items_public` |
+| 32 | `32_sell_bot_event.sql` | правила продажи (`sell_price_of`, `inventory_sell_prices`) и `sell_item`; из бота — одно агрегированное событие |
+| 35 | `35_add_item_to_inventory.sql` | атомарная вставка или увеличение стака предмета |
 | 36 | `36_update_balance_increment_stats.sql` | атомарный баланс и статистика |
-| 37 | `37_get_inventory_with_prices.sql` | инвентарь вместе с ценами продажи |
 | 38 | `38_extra_indexes.sql` | дополнительные индексы под горячие запросы |
-| 39 | `39_record_catch.sql` | атомарная запись улова |
-| 40 | `40_record_catch_slim.sql` | упрощённый `record_catch`: статистика и журнал |
-| 41 | `41_trim_indexes.sql` | чистка неиспользуемых индексов |
-| 42 | `42_unique_fish_via_inventory.sql` | уникальные рыбы только в `inventory` |
-| 43 | `43_drop_unique_fish_index.sql` | удаление старого unique-индекса |
-| 44 | `44_artifact_roll_scalar_safe.sql` | ролл статов артефактов без падения на скалярах |
-| 45 | `45_jsonb_double_encode_fix.sql` | починка jsonb, записанного двойным кодированием |
 | 46 | `46_bot_access_and_hardening.sql` | объединённый шаг 46–50: стример подключает бота, админ-панель управляет каналом и баном, значок `channel:bot`, Twitch ID из `auth.identities`; кабинет читает из `channels` только публичные колонки |
 | 47 | `47_bot_badge_rpc_hardening.sql` | закрывает `request_bot_badge_access` для `authenticated`: bot_badge-поля пишет только `service_role` (Edge Function twitch-badge); кабинет теряет write-права на `channels` |
 | 48 | `48_bot_joined_at_cleanup.sql` | бан канала очищает `bot_joined_at`: после разблокировки кабинет не показывает старое время входа |
 | 49 | `49_bot_heartbeat.sql` | `bot_heartbeat` + RPC `bot_heartbeat()`: бот раз в две минуты отмечает, что запущен, кабинет показывает, на связи ли он |
 | 50 | `50_player_feedback.sql` | отзывы игроков: таблица `player_feedback`, RPC `submit_player_feedback` с проверкой автора, канала, длины и лимитов |
-| 51 | `51_extra_indexes.sql` | дополнительные индексы |
 | 52 | `52_fix_search_path.sql` | закрепление `search_path` для функций артефактов |
 | 53 | `53_bot_channel_default_blocked.sql` | новая заявка на бота по умолчанию заблокирована (включая существующие строки канала) |
+| 55 | `55_abyss.sql` | эндгейм «Бездна»: сезоны и лестница, прогресс, осколки, журнал нырков, view статистики |
+| 56 | `56_abyss_channel_config.sql` | настройки Бездны на канал: отличия от `abyss.json` |
+| 57 | `57_zombie_write_idempotency.sql` | идемпотентность записей по `msg.id`: повтор не начисляет XP/уловы и не изнашивает снаряжение |
+| 59 | `59_processed_message_actions_cleanup.sql` | очистка ключей идемпотентности старше 30 дней (`cleanup_processed_message_actions`) |
+| 60 | `60_player_catch_history.sql` | история уловов (счётчики и доход), `record_catch`, `my_caught_fish_ids`, `get_dashboard_stats`, чистка `catches` старше 30 дней |
+| 62 | `62_events_retention.sql` | очистка журнала `events` старше 30 дней (`cleanup_events`) |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -84,49 +71,36 @@
 08_events.sql
 09_views.sql
 10_rls.sql
-11_dashboard_stats.sql
-12_sell.sql
 13_chances.sql
 14_chances_refresh.sql
 15_artifact_cleanse.sql
 16_artifact_catalog_grants.sql
-17_buy_artifact.sql
 18_admin_grant_artifact.sql
-19_shop_items.sql
 20_buy_item.sql
 21_repair.sql
-22_sell_quantity.sql
 23_shop_state.sql
 24_hardening.sql
 25_items_public.sql
-26_shop_items_effects.sql
 27_equipment_modifiers.sql
 28_shop_items_modifiers.sql
 29_fish_collection.sql
-30_hidden_sell_guard.sql
-31_unique_fish_claims.sql
 32_sell_bot_event.sql
-33_drop_legacy_fields.sql
-34_decrease_durability.sql
 35_add_item_to_inventory.sql
 36_update_balance_increment_stats.sql
-37_get_inventory_with_prices.sql
 38_extra_indexes.sql
-39_record_catch.sql
-40_record_catch_slim.sql
-41_trim_indexes.sql
-42_unique_fish_via_inventory.sql
-43_drop_unique_fish_index.sql
-44_artifact_roll_scalar_safe.sql
-45_jsonb_double_encode_fix.sql
 46_bot_access_and_hardening.sql
 47_bot_badge_rpc_hardening.sql
 48_bot_joined_at_cleanup.sql
 49_bot_heartbeat.sql
 50_player_feedback.sql
-51_extra_indexes.sql
 52_fix_search_path.sql
 53_bot_channel_default_blocked.sql
+55_abyss.sql
+56_abyss_channel_config.sql
+57_zombie_write_idempotency.sql
+59_processed_message_actions_cleanup.sql
+60_player_catch_history.sql
+62_events_retention.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
@@ -140,12 +114,25 @@
 новые имена и уберёт из `migration_order` старые неприменённые записи, чтобы их
 нельзя было запустить по ошибке.
 
+Набор сокращён для чистой базы: 21 файл удалён, потому что его содержимое целиком
+переписано более поздними шагами. Слияния: 11→60, 12/22/30/54→32, 17→23, 19/26→28,
+34→57, 39/40→60, 44→15, 51→38, 61→60; реестр уникальных рыб (31/42/43), legacy-поля
+(33), чистка индексов (41), перегрузки записи (58) и разовая починка JSON (45)
+чистой базе не нужны. Номера в `migration_order` сохранили исходные значения,
+поэтому в списке есть пропуски.
+
+Шаги 63 и 64 удалены: 63 открывал кабинету чтение `player_catch_history`, а 64
+сразу его отменял. Вместе они ничего не создают, поэтому новой базе не нужны.
+Где они применялись, состояние уже такое же: прямого доступа к истории уловов
+нет, коллекция идёт через `my_caught_fish_ids`. Отметки об их запуске остаются
+в `schema_migrations`, а номер 65 в `migration_order` свободен для следующего шага.
+
 ## Три ситуации
 
-**Новая (пустая) база.** `00` → `01…48` по порядку. `00b` не нужен.
+**Новая (пустая) база.** `00` → `01…62` по порядку. `00b` не нужен.
 
 **Решили начать с нуля.** Сначала `00_reset_db.sql` — он удаляет схему `public`
-со всем содержимым и возвращает ей права Supabase, потом `00` → `01…48`.
+со всем содержимым и возвращает ей права Supabase, потом `00` → `01…62`.
 Так база гарантированно соответствует файлам, без сверки того, что уже применено.
 Данные пропадут; аккаунты Supabase Auth (схема `auth`) остаются, но связка
 `accounts` (Twitch ID ↔ auth) создастся заново и её нужно будет заполнить входом в кабинет.
@@ -160,7 +147,7 @@
 иначе пропущенный шаг остался бы невыполненным, но закрытым от запуска.
 
 Если разбираться, какие шаги уже сделаны, не хочется — берите `00_reset_db.sql`
-и проходите `00` → `01…46` целиком.
+и проходите `00` → `01…62` целиком.
 
 ## Проверка после запуска
 
@@ -174,22 +161,22 @@ with checks(name, ok) as (values
     ('таблица accounts',                  to_regclass('public.accounts') is not null),
     ('таблица players',                   to_regclass('public.players') is not null),
     ('таблица inventory',                 to_regclass('public.inventory') is not null),
-    ('таблица unique_fish_claims',        to_regclass('public.unique_fish_claims') is not null),
-    ('триггер inventory_unique_fish_claim', exists (
+    ('таблица player_catch_history',      to_regclass('public.player_catch_history') is not null),
+    ('триггер catches_history_trigger',   exists (
         select 1
         from pg_trigger t
         join pg_class c on c.oid = t.tgrelid
-        where c.relname = 'inventory'
-          and t.tgname = 'inventory_unique_fish_claim'
+        where c.relname = 'catches'
+          and t.tgname = 'catches_history_trigger'
           and not t.tgisinternal
     )),
     ('функция update_balance(...)',       to_regprocedure('public.update_balance(bigint,bigint,integer)') is not null),
     ('функция increment_stats(...)',      to_regprocedure('public.increment_stats(bigint,bigint,integer,integer)') is not null),
     ('функция add_item_to_inventory(...)', to_regprocedure('public.add_item_to_inventory(bigint,bigint,text,public.item_kind,integer,jsonb,text,boolean,boolean)') is not null),
-    ('функция decrease_durability(...)',  to_regprocedure('public.decrease_durability(bigint,bigint,boolean)') is not null),
-    ('функция get_inventory_with_prices(...)', to_regprocedure('public.get_inventory_with_prices(bigint,bigint)') is not null),
-    ('legacy_id удалён из inventory',     not exists (select 1 from information_schema.columns
-        where table_schema = 'public' and table_name = 'inventory' and column_name = 'legacy_id')),
+    ('функция decrease_durability(...)',  to_regprocedure('public.decrease_durability(bigint,bigint,boolean,text)') is not null),
+    ('cleanup_catches(integer)',          to_regprocedure('public.cleanup_catches(integer)') is not null),
+    ('cleanup_events(integer)',           to_regprocedure('public.cleanup_events(integer)') is not null),
+    ('cleanup_processed_message_actions(integer)', to_regprocedure('public.cleanup_processed_message_actions(integer)') is not null),
     ('таблица catches',                   to_regclass('public.catches') is not null),
     ('таблица events',                    to_regclass('public.events') is not null),
     ('таблица player_chances',            to_regclass('public.player_chances') is not null),

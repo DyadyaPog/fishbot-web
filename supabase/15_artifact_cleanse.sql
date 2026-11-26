@@ -33,7 +33,12 @@ alter table artifact_catalog add column if not exists price integer not null def
 alter table artifact_catalog add column if not exists effects jsonb not null default '[]'::jsonb;
 alter table artifact_catalog add column if not exists curse_effects jsonb not null default '[]'::jsonb;
 alter table artifact_catalog add column if not exists curse_chance numeric not null default 0;
-alter table artifact_catalog add column if not exists updated_at timestamptz not null default now();
+alter table artifact_catalog add column if not exists updated_at    timestamptz not null default now();
+-- Минимальный уровень игрока для покупки артефакта (раньше добавлялся шагом 17).
+alter table artifact_catalog add column if not exists level_required integer not null default 1;
+
+comment on column artifact_catalog.level_required is
+    'Минимальный уровень игрока для покупки артефакта. Синхронизируется из artifacts.json.';
 
 comment on table artifact_catalog is
     'Эффекты, цена и шанс проклятия артефактов: источник для RPC покупки и очистки. Синхронизирует бот из artifacts.json.';
@@ -443,6 +448,74 @@ on conflict (item_id) do update set
     curse_chance  = excluded.curse_chance,
     updated_at    = now();
 
+
+-- ---------------------------------------------------------------------------
+-- Устойчивость ролла к скалярам в effects/curse_effects (бывший шаг 44).
+-- jsonb_array_elements падает на скаляре, поэтому не-массивы приводим к [].
+-- ---------------------------------------------------------------------------
+
+create or replace function artifact_roll_effects(p_effects jsonb)
+returns jsonb
+language sql
+volatile
+as $$
+    select coalesce(
+        jsonb_agg(artifact_roll_effect(effect) order by ord),
+        '[]'::jsonb
+    )
+    from jsonb_array_elements(
+        case when jsonb_typeof(coalesce(p_effects, '[]'::jsonb)) = 'array'
+             then coalesce(p_effects, '[]'::jsonb)
+             else '[]'::jsonb
+        end
+    )
+         with ordinality as t(effect, ord);
+$$;
+
+comment on function artifact_roll_effects(jsonb) is
+    'Перероллить все эффекты артефакта из каталога. Устойчив к не-массивам.';
+
+create or replace function artifact_worsen_effects(p_effects jsonb, p_factor numeric)
+returns jsonb
+language sql
+volatile
+as $$
+    select coalesce(
+        jsonb_agg(
+            jsonb_strip_nulls(jsonb_build_object(
+                'type', rolled->>'type',
+                'target', rolled->'target',
+                'value', case
+                    when rolled->>'type' in ('gold_bonus', 'inventory_bonus')
+                        then floor(artifact_worsen_value(
+                            rolled->>'type',
+                            rolled->>'target',
+                            (rolled->>'value')::numeric,
+                            p_factor
+                        ) + 0.5)
+                    else floor(artifact_worsen_value(
+                        rolled->>'type',
+                        rolled->>'target',
+                        (rolled->>'value')::numeric,
+                        p_factor
+                    ) * 1000 + 0.5) / 1000
+                end
+            )) order by ord
+        ),
+        '[]'::jsonb
+    )
+    from jsonb_array_elements(
+        case when jsonb_typeof(coalesce(p_effects, '[]'::jsonb)) = 'array'
+             then coalesce(p_effects, '[]'::jsonb)
+             else '[]'::jsonb
+        end
+    )
+         with ordinality as t(effect, ord)
+    cross join lateral (select artifact_roll_effect(effect) as rolled) r;
+$$;
+
+comment on function artifact_worsen_effects(jsonb, numeric) is
+    'Усилить проклятие артефакта. Устойчив к не-массивам.';
 
 -- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
 select register_migration('15_artifact_cleanse.sql');

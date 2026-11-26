@@ -2,17 +2,161 @@
 select assert_migration('32_sell_bot_event.sql');
 
 -- ============================================================================
--- Шаг 32: продажа из бота не пишет отдельное событие на каждую строку.
+-- Шаг 32: правила продажи и продажа предмета.
 --
--- Раньше sell_item всегда вставлял строку events(type='inventory_sell').
--- Для !sell ALL это давало N записей на одну команду. Теперь при вызове от
--- service_role (бот) событие не пишется в SQL: бот сам собирает все проданные
--- строки и пишет одно агрегированное событие inventory_sell. Продажа из
--- кабинета (authenticated) по-прежнему логируется по одной строке.
+-- Здесь живёт всё, что связано с продажей, чтобы правила цены не разъезжались:
+--   * sell_price_of() — единственное место с правилами цены (!sell и кабинет);
+--   * inventory_sell_prices() — цены для карточек кабинета и !bag;
+--   * sell_item() — сама продажа (часть стака, тайная рыба, событие).
 --
--- Запускать в Supabase → SQL Editor после 31_unique_fish_claims.sql.
+-- Раньше это были шаги 12, 22, 30 и 54; для чистой базы они объединены, потому
+-- что каждый следующий лишь переписывал предыдущий.
+--
+-- Продажа из бота не пишет событие на каждую строку: при вызове от
+-- service_role событие собирает бот одним агрегированным inventory_sell.
+-- Продажа из кабинета (authenticated) по-прежнему логируется по одной строке.
+--
+-- Запускать в Supabase → SQL Editor после 29_fish_collection.sql.
 -- Скрипт идемпотентен.
 -- ============================================================================
+
+-- ---------------------------------------------------------------------------
+-- sell_price_of(): единственное место с правилами цены продажи
+-- ---------------------------------------------------------------------------
+-- Функция чистая: ничего не читает из аккаунта и не меняет данные, поэтому
+-- её можно вызывать и для выплаты, и для предпросмотра цены в кабинете.
+
+create or replace function sell_price_of(
+    p_item_id     text,
+    p_item_type   item_kind,
+    p_meta        jsonb,
+    p_quantity    integer,
+    p_created_at  timestamptz
+)
+returns integer
+language plpgsql
+stable
+set search_path = public
+as $$
+declare
+    v_meta      jsonb   := coalesce(p_meta, '{}'::jsonb);
+    v_qty       integer := greatest(1, coalesce(p_quantity, 1));
+    v_buyback   boolean := p_item_type in ('rod', 'line', 'hook', 'bait', 'artifact');
+    v_base      numeric;
+    v_uses      numeric;
+    v_max_uses  numeric;
+    v_price     numeric;
+begin
+    -- В meta фактическая цена экземпляра (у рыбы — стоимость улова, у
+    -- снаряжения — цена покупки). Нет её — берём каталожную из items.
+    if jsonb_typeof(v_meta->'price') = 'number' then
+        v_base := (v_meta->>'price')::numeric;
+    else
+        select i.price into v_base from items i where i.id = p_item_id;
+        v_base := coalesce(v_base, 0);
+    end if;
+
+    if not v_buyback then
+        return greatest(0, round(v_base * v_qty)::integer);
+    end if;
+
+    if jsonb_typeof(v_meta->'uses') = 'number' then
+        v_uses := (v_meta->>'uses')::numeric;
+    elsif jsonb_typeof(v_meta->'durability') = 'number' then
+        v_uses := (v_meta->>'durability')::numeric;
+    end if;
+    if jsonb_typeof(v_meta->'max_uses') = 'number' then
+        v_max_uses := (v_meta->>'max_uses')::numeric;
+    end if;
+
+    if p_item_type <> 'artifact'
+       and (v_uses is null or v_uses = -1
+            or (v_max_uses is not null and v_max_uses > 0 and v_uses >= v_max_uses * v_qty))
+       and p_created_at >= now() - interval '5 minutes' then
+        -- Ошибочная покупка снаряжения: неиспользованный предмет идёт по полной.
+        v_price := v_base * v_qty;
+    elsif v_max_uses is not null and v_max_uses > 0
+          and v_uses is not null and v_uses <> -1 then
+        v_price := v_base * 0.5 * (least(v_uses, v_qty * v_max_uses) / v_max_uses);
+    else
+        -- Артефакт попадает сюда всегда: прочности нет, полный возврат не положен.
+        v_price := v_base * 0.5 * v_qty;
+    end if;
+
+    return greatest(0, round(v_price)::integer);
+end $$;
+
+comment on function sell_price_of(text, item_kind, jsonb, integer, timestamptz) is
+    'Цена продажи предмета по правилам !sell: артефакты без окна полного возврата.';
+
+revoke all on function sell_price_of(text, item_kind, jsonb, integer, timestamptz) from public, anon;
+grant execute on function sell_price_of(text, item_kind, jsonb, integer, timestamptz) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- inventory_sell_prices(): цены для карточек кабинета и !bag
+-- ---------------------------------------------------------------------------
+-- Возвращает цены только для игрока из auth.uid() (кабинет) или p_user_id
+-- (бот под service_role). Браузер получает те же числа, что начислит
+-- sell_item, и ничего не считает сам. Тайная рыба не продаётся (null).
+
+create or replace function inventory_sell_prices(
+    p_channel_id bigint,
+    p_user_id    bigint default null
+)
+returns table (
+    inventory_id   bigint,
+    sell_price     integer,
+    refund_ends_at timestamptz,
+    server_now     timestamptz
+)
+language plpgsql
+security definer
+stable
+set search_path = public
+as $$
+declare
+    v_role text := auth.role();
+    v_user bigint;
+begin
+    if coalesce(v_role, '') = 'service_role' then
+        v_user := p_user_id;
+    else
+        select a.user_id into v_user
+        from accounts a
+        where a.auth_id = auth.uid();
+    end if;
+
+    if v_user is null then
+        return;
+    end if;
+
+    return query
+    select i.id,
+           case
+               when it.rarity = 'hidden' then null
+               else sell_price_of(i.item_id, i.item_type, i.meta, i.quantity, i.created_at)
+           end,
+           case
+               -- У артефактов полного возврата нет: таймер кабинету не нужен.
+               when i.item_type in ('rod', 'line', 'hook', 'bait')
+                   then i.created_at + interval '5 minutes'
+           end,
+           now()
+      from inventory i
+      left join items it on it.id = i.item_id
+     where i.channel_id = p_channel_id
+       and i.user_id = v_user;
+end $$;
+
+comment on function inventory_sell_prices(bigint, bigint) is
+    'Цены продажи предметов игрока на канале для кабинета и !bag. Тайная рыба не продаётся, артефакты без окна полного возврата.';
+
+revoke all on function inventory_sell_prices(bigint, bigint) from public, anon;
+grant execute on function inventory_sell_prices(bigint, bigint) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------------
+-- sell_item(): продажа предмета или части стака
+-- ---------------------------------------------------------------------------
 
 create or replace function sell_item(
     p_inventory_id bigint,
@@ -68,6 +212,7 @@ begin
         raise exception 'предмет отсутствует в каталоге' using errcode = 'P0002';
     end if;
 
+    -- Тайная редкость — пасхалка, а не источник золота.
     if v_item.rarity = 'hidden' then
         raise exception 'тайную рыбу продать нельзя' using errcode = '22023';
     end if;
@@ -161,4 +306,5 @@ comment on function sell_item(bigint, integer, text) is
 revoke all on function sell_item(bigint, integer, text) from public, anon;
 grant execute on function sell_item(bigint, integer, text) to authenticated, service_role;
 
+-- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
 select register_migration('32_sell_bot_event.sql');

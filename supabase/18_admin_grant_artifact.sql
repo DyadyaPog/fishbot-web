@@ -8,8 +8,8 @@ select assert_migration('18_admin_grant_artifact.sql');
 -- admin_grant выполняются одной транзакцией. Кабинет вызывает RPC через
 -- service_role; локальный JS-ролл при выдаче больше не используется.
 --
--- Запускать в Supabase → SQL Editor после 15_artifact_cleanse.sql и
--- 17_buy_artifact.sql. Скрипт идемпотентен.
+-- Запускать в Supabase → SQL Editor после 16_artifact_catalog_grants.sql.
+-- Скрипт идемпотентен.
 -- ============================================================================
 
 drop function if exists admin_grant_artifact(text, bigint, bigint, text, text);

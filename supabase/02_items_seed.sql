@@ -4,8 +4,12 @@
 -- Сгенерировано из конфигов бота fishBot/src/config/:
 --   loot-table.json, fishing-equipment.json, artifacts.json, consumables.json.
 -- Записей: 177 (без пустых забросов).
--- Запускать после 01_items.sql. Повторный запуск обновляет name/rarity/price/kind/description/level_required/max_uses.
+--
+-- Запускать после 01_items.sql. Шаг повторяемый: каждый запуск обновляет
+-- name/rarity/price/kind/description/level_required/max_uses и модификаторы.
 -- ============================================================================
+
+select assert_migration('02_items_seed.sql', true);
 
 insert into items (id, name, rarity, price, kind, description, level_required, max_uses, type_modifiers, rarity_modifiers) values
     ('carp', 'Карп', 'common', 12, 'fish', null, 1, null, '{}'::jsonb, '{}'::jsonb),
@@ -195,3 +199,5 @@ on conflict (id) do update set
     max_uses    = excluded.max_uses,
     type_modifiers = excluded.type_modifiers,
     rarity_modifiers = excluded.rarity_modifiers;
+
+select register_migration('02_items_seed.sql');

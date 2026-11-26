@@ -17,8 +17,6 @@ alter function public.artifact_roll_effects(jsonb) set search_path = public;
 alter function public.artifact_worsen_value(text, text, numeric, numeric) set search_path = public;
 alter function public.artifact_worsen_effects(jsonb, numeric) set search_path = public;
 alter function public.repair_cost_of(numeric, numeric, numeric) set search_path = public;
-alter function public.get_dashboard_stats(bigint) set search_path = public;
-alter function public.jsonb_unwrap_string(jsonb) set search_path = public;
 
 -- Отметка в учёте миграций.
 select register_migration('52_fix_search_path.sql');

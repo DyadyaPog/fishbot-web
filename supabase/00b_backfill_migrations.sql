@@ -8,6 +8,8 @@
 --
 -- Запускать один раз, сразу после 00_schema_migrations.sql и до следующих шагов.
 -- Безопасно запускать повторно: register_migration не создаёт дублей.
+-- Скрипт знает только базовые шаги 01–29: шаги после 29 отмечаются своим запуском
+-- по номеру, и на текущей базе они уже отмечены.
 -- Ничего не создаёт и не меняет в схеме — только читает каталог.
 -- ============================================================================
 
@@ -49,21 +51,13 @@ begin
         perform register_migration('08_events.sql');
     end if;
 
-    -- 09–14: представления, RLS, дашборд, продажа, шансы.
+    -- 09–14: представления, RLS, шансы и запросы на пересчёт.
     if to_regclass('public.my_channels') is not null then
         perform register_migration('09_views.sql');
     end if;
 
     if to_regprocedure('public.claim_profile()') is not null then
         perform register_migration('10_rls.sql');
-    end if;
-
-    if to_regprocedure('public.get_dashboard_stats(bigint)') is not null then
-        perform register_migration('11_dashboard_stats.sql');
-    end if;
-
-    if to_regprocedure('public.sell_price_of(text,public.item_kind,jsonb,integer,timestamptz)') is not null then
-        perform register_migration('12_sell.sql');
     end if;
 
     if to_regclass('public.player_chances') is not null then
@@ -84,17 +78,8 @@ begin
         perform register_migration('16_artifact_catalog_grants.sql');
     end if;
 
-    if to_regprocedure('public.buy_artifact(text,bigint,bigint,text,text)') is not null
-       or to_regprocedure('public.buy_artifact_impl(text,bigint,bigint,text,text)') is not null then
-        perform register_migration('17_buy_artifact.sql');
-    end if;
-
     if to_regprocedure('public.admin_grant_artifact(text,bigint,bigint,text,text)') is not null then
         perform register_migration('18_admin_grant_artifact.sql');
-    end if;
-
-    if to_regprocedure('public.shop_items(text)') is not null then
-        perform register_migration('19_shop_items.sql');
     end if;
 
     if to_regprocedure('public.buy_item(text,bigint,bigint,integer,text,text,integer)') is not null
@@ -105,10 +90,6 @@ begin
     -- 21–25: ремонт, продажа с количеством, магазин, безопасность, витрина.
     if to_regprocedure('public.repair_item(bigint,text)') is not null then
         perform register_migration('21_repair.sql');
-    end if;
-
-    if to_regprocedure('public.sell_item(bigint,integer,text)') is not null then
-        perform register_migration('22_sell_quantity.sql');
     end if;
 
     if to_regclass('public.shop_state') is not null then

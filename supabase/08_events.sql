@@ -22,18 +22,14 @@ create table if not exists events (
     -- Остальные поля события: artifactId, artifactType, rarity, price,
     -- cursed, effects, metadata, username.
     payload     jsonb       not null default '{}'::jsonb,
-    -- id строки в artifact_events SQLite: ключ повторного переноса.
-    legacy_id   bigint,
     created_at  timestamptz not null default now(),
     constraint events_player_fk
         foreign key (channel_id, user_id)
         references players (channel_id, user_id)
-        on delete cascade,
-    constraint events_legacy_key unique (channel_id, legacy_id)
+        on delete cascade
 );
 
 alter table events add column if not exists message_id text;
-alter table events add column if not exists legacy_id   bigint;
 
 comment on table events is
     'События канала: админ-выдача, покупки, рероллы и прочее. Детали — в payload.';

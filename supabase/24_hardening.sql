@@ -13,7 +13,7 @@ select assert_migration('24_hardening.sql');
 --   6. buy_item продаёт только то, что реально есть в витрине (цена > 0);
 --   7. equip_item / unequip_item блокируют строку игрока — без гонки за слот;
 --   8. request_chances_refresh проверяет игрока на канале и не даёт спамить;
---   9. права на chance_refresh_requests и get_dashboard_stats отозваны явно.
+--   9. права на chance_refresh_requests отозваны явно.
 --
 -- Запускать в Supabase → SQL Editor после 23_shop_state.sql.
 -- Скрипт идемпотентен: функции пересоздаются, политики пересоздаются.
@@ -604,10 +604,8 @@ grant execute on function request_chances_refresh(bigint) to authenticated;
 -- полагаться на это не стоит.
 revoke all on public.chance_refresh_requests from anon, authenticated;
 
--- get_dashboard_stats — invoker-функция с правами PUBLIC по умолчанию.
--- Считает она только для бота, поэтому закрываем её от клиентов.
-revoke all on function get_dashboard_stats(bigint) from public, anon, authenticated;
-grant execute on function get_dashboard_stats(bigint) to service_role;
+-- Права самого get_dashboard_stats закрываются там, где он создаётся
+-- (шаг 60): здесь этой функции ещё нет.
 
 -- Отметка в учёте миграций: повторный запуск этого файла будет остановлен.
 select register_migration('24_hardening.sql');

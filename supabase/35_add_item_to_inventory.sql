@@ -6,11 +6,10 @@ select assert_migration('35_add_item_to_inventory.sql');
 --
 -- Раньше бот делал SELECT существующей строки, а затем PATCH или INSERT —
 -- два запроса на каждый улов. Теперь вся логика (поиск стака, увеличение
--- количества или вставка новой строки вместе с claim уникального тега)
--- выполняется одной транзакцией в Postgres. При конфликте уникального тега
--- возвращается code='unique_conflict', как и раньше.
+-- количества или вставка новой строки) выполняется одной транзакцией
+-- в Postgres и возвращает jsonb с ok/кодом ошибки.
 --
--- Запускать в Supabase → SQL Editor после 34_decrease_durability.sql.
+-- Запускать в Supabase → SQL Editor после 32_sell_bot_event.sql.
 -- Скрипт идемпотентен.
 -- ============================================================================
 
@@ -76,17 +75,12 @@ begin
 
     return jsonb_build_object('ok', true);
 exception
-    when unique_violation then
-        if SQLERRM ilike '%unique_fish_claims%' then
-            return jsonb_build_object('ok', false, 'code', 'unique_conflict', 'error', SQLERRM);
-        end if;
-        return jsonb_build_object('ok', false, 'code', 'db_error', 'error', SQLERRM);
     when others then
         return jsonb_build_object('ok', false, 'code', 'db_error', 'error', SQLERRM);
 end $$;
 
 comment on function add_item_to_inventory(bigint, bigint, text, item_kind, integer, jsonb, text, boolean, boolean) is
-    'Атомарная вставка или увеличение стака предмета в инвентаре; при конфликте уникального тега возвращает unique_conflict.';
+    'Атомарная вставка или увеличение стака предмета в инвентаре; ошибка возвращается как db_error.';
 
 revoke all on function add_item_to_inventory(bigint, bigint, text, item_kind, integer, jsonb, text, boolean, boolean) from public, anon;
 grant execute on function add_item_to_inventory(bigint, bigint, text, item_kind, integer, jsonb, text, boolean, boolean) to service_role;

@@ -372,6 +372,7 @@
         return state.itemsCatalog.get(String(id)) || null;
     }
 
+
     function toast(message) {
         const node = el('toast');
         node.textContent = message;
@@ -622,6 +623,9 @@
                 .eq('user_id', state.userId)
                 .order('item_type')
                 .order('id'),
+            /* Последние уловы — именно журнал catches: это лента конкретных
+               событий. Коллекция считается по истории (my_caught_fish_ids), а
+               сам журнал чистится по сроку хранения (шаг 60). */
             client.from('catches')
                 .select('item_id,price,caught_at')
                 .eq('channel_id', channelId)

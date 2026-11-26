@@ -1,18 +1,18 @@
 -- ============================================================================
 -- Шаг 0: учёт миграций.
 --
--- Зачем: файлы вида 17_buy_artifact.sql и 23_shop_state.sql меняют одни и те
+-- Зачем: файлы вида 23_shop_state.sql и 25_items_public.sql меняют одни и те
 -- же функции. Если применить 17 ещё раз после 23, вернётся незагейченная
 -- покупка артефакта, и магазин снова можно обойти. Поэтому каждый файл
 -- начинается с assert_migration(...) и падает, если его уже применяли или
 -- если в базе есть шаг новее.
 --
 -- Порядок запуска:
---   Новая (пустая) база:   00_schema_migrations.sql → 01…46 по порядку.
---   Начать с нуля:         00_reset_db.sql → 00 → 01…46.
+--   Новая (пустая) база:   00_schema_migrations.sql → 01…62 по порядку.
+--   Начать с нуля:         00_reset_db.sql → 00 → 01…62.
 --   База с ручными шагами: 00 → 00b_backfill_migrations.sql → только неотмеченные.
 --
--- На пустой базе 00b не нужен: 01…46 сами отметятся при первом запуске.
+-- На пустой базе 00b не нужен: шаги сами отметятся при первом запуске.
 -- Запускать в Supabase → SQL Editor. Скрипт идемпотентен.
 -- ============================================================================
 
@@ -34,6 +34,10 @@ create table if not exists public.migration_order (
 comment on table public.migration_order is
     'Порядок SQL-шагов по имени файла: по нему проверяется, не отстал ли файл.';
 
+-- Набор шагов для чистой базы: 42 файла. Номера idx сохранили исходные
+-- значения, поэтому в списке есть пропуски — это шаги, которые целиком
+-- переписаны более поздними и удалены (см. delete ниже). Следующий новый шаг
+-- берёт idx 65: он свободен и на этой, и на уже применённой базе.
 insert into public.migration_order (idx, filename) values
     (1,  '01_items.sql'),
     (2,  '02_items_seed.sql'),
@@ -47,50 +51,73 @@ insert into public.migration_order (idx, filename) values
     (10, '08_events.sql'),
     (11, '09_views.sql'),
     (12, '10_rls.sql'),
-    (13, '11_dashboard_stats.sql'),
-    (14, '12_sell.sql'),
     (15, '13_chances.sql'),
     (16, '14_chances_refresh.sql'),
     (17, '15_artifact_cleanse.sql'),
     (18, '16_artifact_catalog_grants.sql'),
-    (19, '17_buy_artifact.sql'),
     (20, '18_admin_grant_artifact.sql'),
-    (21, '19_shop_items.sql'),
     (22, '20_buy_item.sql'),
     (23, '21_repair.sql'),
-    (24, '22_sell_quantity.sql'),
     (25, '23_shop_state.sql'),
     (26, '24_hardening.sql'),
     (27, '25_items_public.sql'),
-    (28, '26_shop_items_effects.sql'),
     (29, '27_equipment_modifiers.sql'),
     (30, '28_shop_items_modifiers.sql'),
     (31, '29_fish_collection.sql'),
-    (32, '30_hidden_sell_guard.sql'),
-    (33, '31_unique_fish_claims.sql'),
     (34, '32_sell_bot_event.sql'),
-    (35, '33_drop_legacy_fields.sql'),
-    (36, '34_decrease_durability.sql'),
     (37, '35_add_item_to_inventory.sql'),
     (38, '36_update_balance_increment_stats.sql'),
-    (39, '37_get_inventory_with_prices.sql'),
     (40, '38_extra_indexes.sql'),
-    (41, '39_record_catch.sql'),
-    (42, '40_record_catch_slim.sql'),
-    (43, '41_trim_indexes.sql'),
-    (44, '42_unique_fish_via_inventory.sql'),
-    (45, '43_drop_unique_fish_index.sql'),
-    (46, '44_artifact_roll_scalar_safe.sql'),
-    (47, '45_jsonb_double_encode_fix.sql'),
     (48, '46_bot_access_and_hardening.sql'),
     (49, '47_bot_badge_rpc_hardening.sql'),
     (50, '48_bot_joined_at_cleanup.sql'),
     (51, '49_bot_heartbeat.sql'),
     (52, '50_player_feedback.sql'),
-    (53, '51_extra_indexes.sql'),
     (54, '52_fix_search_path.sql'),
-    (55, '53_bot_channel_default_blocked.sql')
+    (55, '53_bot_channel_default_blocked.sql'),
+    (57, '55_abyss.sql'),
+    (58, '56_abyss_channel_config.sql'),
+    (59, '57_zombie_write_idempotency.sql'),
+    (61, '59_processed_message_actions_cleanup.sql'),
+    (62, '60_player_catch_history.sql'),
+    (64, '62_events_retention.sql')
 on conflict (idx) do update set filename = excluded.filename;
+
+-- Шаги, которых больше нет: их содержимое перенесено в более поздние файлы
+-- (11→60, 12/22/30/54→32, 17→23, 19/26→28, 31/42/43 — реестр уникальных рыб
+-- не нужен, 33 — legacy-поля не создаются вовсе, 34→57, 37 — функция без
+-- вызовов, 39/40 — 60, 41 — индексы не создаются, 44→15, 45 — нечего
+-- исправлять на чистой базе, 51→38, 58 — перегрузок нет, 61→60). На уже
+-- применённой базе отметки в schema_migrations остаются, а из порядка
+-- убираем только неприменённые.
+delete from public.migration_order o
+ where o.filename in (
+     '11_dashboard_stats.sql',
+     '12_sell.sql',
+     '17_buy_artifact.sql',
+     '19_shop_items.sql',
+     '22_sell_quantity.sql',
+     '26_shop_items_effects.sql',
+     '30_hidden_sell_guard.sql',
+     '31_unique_fish_claims.sql',
+     '33_drop_legacy_fields.sql',
+     '34_decrease_durability.sql',
+     '37_get_inventory_with_prices.sql',
+     '39_record_catch.sql',
+     '40_record_catch_slim.sql',
+     '41_trim_indexes.sql',
+     '42_unique_fish_via_inventory.sql',
+     '43_drop_unique_fish_index.sql',
+     '44_artifact_roll_scalar_safe.sql',
+     '45_jsonb_double_encode_fix.sql',
+     '51_extra_indexes.sql',
+     '54_artifact_no_full_refund.sql',
+     '58_drop_legacy_write_signatures.sql',
+     '61_catches_retention.sql'
+ )
+   and not exists (
+       select 1 from public.schema_migrations m where m.filename = o.filename
+   );
 
 -- Отдельные 46–50 больше не существуют: шаги объединены в 46. Убираем их из
 -- порядка, чтобы старый файл нельзя было случайно запустить после объединения.
@@ -107,9 +134,19 @@ delete from public.migration_order o
        select 1 from public.schema_migrations m where m.filename = o.filename
    );
 
--- Заглушки для следующих шагов: раскомментируйте и впишите имя файла, когда
--- он появится. Файл, которого нет в списке, assert_migration не пропустит.
---   ,(40, '38_next_step.sql')
+-- Шаги 63–64 (доступ кабинета к player_catch_history и его откат) удалены: вместе
+-- они ничего не создают, поэтому для чистой установки не нужны. На базе, где
+-- они применялись, состояние уже такое же — доступа к таблице нет. Отметки об
+-- их запуске остаются в schema_migrations, а из порядка имена убираем совсем,
+-- чтобы номер 65 достался следующему живому шагу.
+delete from public.migration_order o
+ where o.filename in (
+     '63_player_catch_history_cabinet.sql',
+     '64_revert_player_catch_history_cabinet.sql'
+ );
+
+-- Новый шаг: впишите строку в insert выше (idx 65 и далее) и создайте файл.
+-- Файл, которого нет в списке, assert_migration не пропустит.
 
 -- ---------------------------------------------------------------------------
 -- assert_migration(): «этот файл ещё не применяли и он не отстал от базы»
