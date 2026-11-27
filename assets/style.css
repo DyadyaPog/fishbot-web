@@ -2407,3 +2407,31 @@ body.auth-pending #page-title { visibility: hidden; }
     color: var(--text-muted);
     line-height: 1.6;
 }
+
+/* Активные баффы расходников (панель «Экипировка»). */
+.buff-row {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: .55rem 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+}
+
+.buff-row:last-child { border-bottom: 0; }
+
+.buff-name { font-weight: 600; }
+
+.buff-effects { display: flex; flex-wrap: wrap; gap: .35rem; }
+
+.buff-remaining {
+    margin-left: auto;
+    font-variant-numeric: tabular-nums;
+    opacity: .75;
+    white-space: nowrap;
+}
+
+.inv-unique {
+    margin-top: .35rem;
+    font-size: .8rem;
+    color: #ffd166;
+}

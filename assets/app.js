@@ -162,7 +162,14 @@
                 { item_id: 'fish_mythic_1', item_type: 'FISH', name: 'Лунный карп', rarity: 'mythic', quantity: 1, is_equipped: false, meta: 'Цена продажи: 4200 💰' },
                 { item_id: 'fish_trash_1', item_type: 'FISH', name: 'Старый сапог', rarity: 'trash', quantity: 3, is_equipped: false, meta: 'Цена продажи: 3 💰' },
                 { item_id: 'fish_treasure_1', item_type: 'FISH', name: 'Затонувший сундук', rarity: 'treasure', quantity: 1, is_equipped: false, meta: 'Цена продажи: 900 💰' },
-                { item_id: 'consumable_repair_1', item_type: 'CONSUMABLE', name: 'Ремонтный набор', rarity: 'uncommon', quantity: 2, is_equipped: false, meta: 'Восстанавливает прочность снаряжения' }
+                { item_id: 'tonic_bite', item_type: 'CONSUMABLE', name: 'Настойка клёва', rarity: 'uncommon', quantity: 2, is_equipped: false, meta: 'Бафф на 25 мин', description: 'На 25 минут рыба клюёт заметнее, но пустых забросов становится больше.' },
+                { item_id: 'scroll_of_cleansing', item_type: 'CONSUMABLE', name: 'Свиток очищения', rarity: 'rare', quantity: 1, is_equipped: false, is_unique: true, meta: 'Снимает проклятие артефакта', description: 'Сжигает проклятие артефакта и заново роллит его обычные эффекты.' }
+            ],
+            /* Демо-баффы: ends_at подставляется при входе в демо в startDemo(). */
+            buffs: [
+                { buff_id: 'tonic_bite', item_id: 'tonic_bite', stack_group: 'chance', buff_name: 'Настойка клёва', effects: [{ type: 'type_modifier', target: 'fish', value: 1.5 }, { type: 'type_modifier', target: 'empty', value: 0.7 }], minutesLeft: 17 },
+                { buff_id: 'gold_dust', item_id: 'gold_dust', stack_group: 'gold', buff_name: 'Золотая пыль', effects: [{ type: 'gold_bonus', value: 5 }], minutesLeft: 9 },
+                { buff_id: 'spirit_feast_xp', item_id: 'spirit_feast', stack_group: 'xp', buff_name: 'Пиршество духов (опыт)', effects: [{ type: 'xp_multiplier', value: 1.25 }], minutesLeft: 26 }
             ],
             catches: [
                 { name: 'Лунный карп', rarity: 'mythic', price: 4200, at: '2 минуты назад' },
@@ -198,7 +205,11 @@
                 { item_id: 'hook_common_2', item_type: 'HOOK', name: 'Крючок новичка', rarity: 'common', type_modifiers: {"fish":1.01,"treasure":1.01,"trash":0.98,"empty":0.98}, rarity_modifiers: {"common":0.96,"uncommon":0.98,"rare":1.04,"epic":1.08,"legendary":1.1,"mythic":1.12}, quantity: 1, is_equipped: true, meta: 'Прочность 92 / 100' },
                 { item_id: 'bait_worm_2', item_type: 'BAIT', name: 'Червь', rarity: 'common', type_modifiers: {"fish":1.45,"trash":0.6,"treasure":1,"empty":0.45}, rarity_modifiers: {"common":0.95,"uncommon":1.05,"rare":1,"epic":1,"legendary":1,"mythic":1}, quantity: 7, is_equipped: true, meta: 'Расходуется при забросе' },
                 { item_id: 'fish_rare_2', item_type: 'FISH', name: 'Зеркальный карп', rarity: 'rare', quantity: 1, is_equipped: false, meta: 'Цена продажи: 74 💰' },
-                { item_id: 'fish_common_2', item_type: 'FISH', name: 'Окунь', rarity: 'common', quantity: 4, is_equipped: false, meta: 'Цена продажи: 9 💰' }
+                { item_id: 'fish_common_2', item_type: 'FISH', name: 'Окунь', rarity: 'common', quantity: 4, is_equipped: false, meta: 'Цена продажи: 9 💰' },
+                { item_id: 'elixir_insight', item_type: 'CONSUMABLE', name: 'Эликсир прозрения', rarity: 'uncommon', quantity: 1, is_equipped: false, meta: 'Бафф на 20 мин', description: 'На 20 минут опыт за улов растёт в полтора раза.' }
+            ],
+            buffs: [
+                { buff_id: 'elixir_insight', item_id: 'elixir_insight', stack_group: 'xp', buff_name: 'Эликсир прозрения', effects: [{ type: 'xp_multiplier', value: 1.5 }], minutesLeft: 12 }
             ],
             catches: [
                 { name: 'Зеркальный карп', rarity: 'rare', price: 74, at: 'минуту назад' },
@@ -461,6 +472,8 @@
             sell_price: null,
             quantity: Number(row.quantity) || 1,
             is_equipped: Boolean(row.is_equipped),
+            /* Уникальные расходники (свиток очищения) помечаются в карточке. */
+            is_unique: Boolean(item && item.is_unique),
             meta: inventoryMetaText(row),
             /* Описание берётся из справочника items (бот синхронизирует его из
                конфигов); если в items пусто — fallback на meta.description
@@ -618,7 +631,7 @@
             toast('Не удалось загрузить справочник предметов');
         }
 
-        const [inventory, catches, chances] = await Promise.all([
+        const [inventory, catches, chances, buffs] = await Promise.all([
             /* Справочник items подгружается отдельно и кэшируется локально,
                поэтому здесь только данные игрока — без join и без дублирования
                метаданных. */
@@ -643,7 +656,14 @@
                 .select('types,rarities_if_fish,updated_at')
                 .eq('channel_id', channelId)
                 .eq('user_id', state.userId)
-                .maybeSingle()
+                .maybeSingle(),
+            /* Активные баффы расходников: активирует их бот, кабинет только
+               показывает. Таблицы может ещё не быть — канал не ломаем. */
+            client.from('player_buffs')
+                .select('buff_id,item_id,stack_group,buff_name,effects,ends_at')
+                .eq('channel_id', channelId)
+                .eq('user_id', state.userId)
+                .order('stack_group')
         ]);
 
         const error = inventory.error || catches.error;
@@ -667,6 +687,16 @@
         } else {
             channel.chances = chances.data || null;
             channel.chancesUpdatedAt = chances.data ? chances.data.updated_at : null;
+        }
+
+        if (buffs.error) {
+            console.warn('player_buffs:', buffs.error.message);
+            channel.buffs = [];
+        } else {
+            channel.buffs = (buffs.data || []).map((row) => ({
+                ...row,
+                effects: Array.isArray(row.effects) ? row.effects : []
+            }));
         }
 
         await attachSellPrices(channel, channelId);
@@ -1394,6 +1424,75 @@
         } catch (e) { /* ignore */ }
     }
 
+    /* Активные баффы расходников. Данные — player_buffs, время считаем
+       по ends_at в браузере; активирует баффы только бот в чате. */
+    function buffRemaining(endsAt) {
+        const end = endsAt ? new Date(endsAt).getTime() : 0;
+        const left = Math.max(0, Math.ceil((end - Date.now()) / 1000));
+        if (left >= 60) {
+            const minutes = Math.floor(left / 60);
+            const seconds = left % 60;
+            return seconds ? `${minutes} мин ${seconds} с` : `${minutes} мин`;
+        }
+        return `${left} с`;
+    }
+
+    function renderBuffs() {
+        const host = el('buffs-panel');
+        if (!host) return;
+
+        const channel = currentChannel();
+        const buffs = (channel && Array.isArray(channel.buffs) ? channel.buffs : [])
+            .filter((buff) => buff && new Date(buff.ends_at).getTime() > Date.now());
+
+        const header = `
+            <div class="panel-header">
+                <div class="panel-title-group">
+                    <div class="panel-title"><span class="panel-icon">⏳</span> Активные баффы</div>
+                    <span class="chances-caption">включаются в чате: !использовать</span>
+                </div>
+            </div>
+        `;
+
+        if (!buffs.length) {
+            host.innerHTML = `
+                <div class="dashboard-panel">
+                    ${header}
+                    <div class="chances-body">
+                        <div class="empty-state">Активных баффов нет</div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        const rows = buffs.map((buff) => {
+            const effects = Array.isArray(buff.effects) ? buff.effects : [];
+            const chips = effects
+                .map((effect) => `<span class="inv-effect-chip">${esc(formatArtifactEffect(effect))}</span>`)
+                .join('');
+            return `
+                <div class="buff-row">
+                    <span class="buff-name">${esc(buff.buff_name || buff.item_id || '')}</span>
+                    <span class="buff-effects">${chips}</span>
+                    <span class="buff-remaining">${esc(buffRemaining(buff.ends_at))}</span>
+                </div>
+            `;
+        }).join('');
+
+        host.innerHTML = `
+            <div class="dashboard-panel">
+                ${header}
+                <div class="chances-body">${rows}</div>
+            </div>
+        `;
+    }
+
+    /* Остатки обновляем, только пока вкладка видима. */
+    setInterval(() => {
+        if (!document.hidden) renderBuffs();
+    }, 30000);
+
     function renderLoadout() {
         const slots = ['ROD', 'LINE', 'HOOK', 'BAIT'];
         const inventory = currentInventory();
@@ -1404,6 +1503,7 @@
             loadoutGrid.innerHTML = equipmentItems.map(renderItemCard).join('');
         }
 
+        renderBuffs();
         renderChances();
 
         el('slot-grid').innerHTML = slots.map((type) => {
@@ -1763,9 +1863,15 @@
         const cleanseButton = item.item_type === 'ARTIFACT' && item.cursed
             ? `<button class="btn-admin primary" data-action="cleanse" data-id="${esc(id)}" title="Снять проклятие: свиток очищения или гадалка за монеты">Очистить</button>`
             : '';
+        /* Расходники активируются только в чате: там бот списывает предмет
+           и пишет бафф в базу, поэтому кнопка здесь информационная. */
+        const consumeButton = item.item_type === 'CONSUMABLE'
+            ? `<button class="btn-admin" disabled title="Активируется в чате: !использовать ${esc(item.name)}">Использовать</button>`
+            : '';
         const secondary = item.item_type === 'CONSUMABLE'
-            ? '<button class="btn-admin" disabled title="Появится вместе с логикой расходников">Использовать</button>' + sellButton
+            ? consumeButton + sellButton
             : cleanseButton + sellButton;
+        const uniqueBadge = item.is_unique ? '<div class="inv-unique">⭐ Уникальный</div>' : '';
 
         /* Цена — из RPC inventory_sell_prices, то есть ровно та, что выплатит sell_item. */
         const hasSellPrice = !isHidden && item.sell_price != null && Number.isFinite(Number(item.sell_price));
@@ -1798,6 +1904,7 @@
                 ${item.item_type === 'ARTIFACT' && Array.isArray(item.effects) && item.effects.length ? `<div class="inv-effects">${item.effects.map((effect) => `<span class="inv-effect-chip" title="${esc(artifactEffectTooltip(effect, false))}">${esc(formatArtifactEffect(effect))}</span>`).join('')}</div>` : ''}
                 ${meta.equippable ? equipmentModChips(item) : ''}
                 ${item.cursed ? '<div class="inv-cursed">☠️ проклят</div>' : ''}
+                ${uniqueBadge}
                 <div class="inv-actions">
                     ${action}
                     ${secondary}
@@ -2741,6 +2848,11 @@
             inventory: channel.inventory.map((item, i) => ({
                 ...item,
                 id: `${channel.id}-${i}`
+            })),
+            /* Демо-баффы: остаток считаем от входа в демо, чтобы таймер шёл. */
+            buffs: (channel.buffs || []).map(({ minutesLeft, ...buff }) => ({
+                ...buff,
+                ends_at: new Date(Date.now() + minutesLeft * 60 * 1000).toISOString()
             })),
             caughtFish: new Set(index === 0
                                  ? ['perch', 'pike', 'golden_carp']

@@ -80,7 +80,8 @@ insert into public.migration_order (idx, filename) values
     (59, '57_zombie_write_idempotency.sql'),
     (61, '59_processed_message_actions_cleanup.sql'),
     (62, '60_player_catch_history.sql'),
-    (64, '62_events_retention.sql')
+    (64, '62_events_retention.sql'),
+    (65, '63_player_buffs.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Шаги, которых больше нет: их содержимое перенесено в более поздние файлы

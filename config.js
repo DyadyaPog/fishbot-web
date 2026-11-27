@@ -16,8 +16,8 @@ window.FISHBOT_CONFIG = {
     // Ник бота в Twitch (логин), который показывается в кабинете.
     // Задаётся repository variable TWITCH_BOT_LOGIN в GitHub (инжектится в CI).
     botLogin: '',
-    // Версия схемы данных: 8 — отзывы игроков (player_feedback, шаг 50).
-    schemaVersion: 8,
+    // Версия схемы данных: 9 — временные баффы расходников (player_buffs, шаг 63).
+    schemaVersion: 9,
     // Общая версия набора картинок рыб: при обновлении изображений поднимайте это число.
     imagesVersion: 5
 };
