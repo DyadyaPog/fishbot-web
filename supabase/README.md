@@ -51,6 +51,12 @@
 | 59 | `59_processed_message_actions_cleanup.sql` | очистка ключей идемпотентности старше 30 дней (`cleanup_processed_message_actions`) |
 | 60 | `60_player_catch_history.sql` | история уловов (счётчики и доход), `record_catch`, `my_caught_fish_ids`, `get_dashboard_stats`, чистка `catches` старше 30 дней |
 | 62 | `62_events_retention.sql` | очистка журнала `events` старше 30 дней (`cleanup_events`) |
+| 64 | `64_leviathan.sql` | событие канала «Левиафан»: `leviathan_hunts`, `leviathan_damage`, `leviathan_line_damage` |
+| 65 | `65_sell_all_loot.sql` | массовая продажа: `sell_all_loot` продаёт всю обычную рыбу и сокровища одной транзакцией (кроме уникальных и тайных) |
+| 66 | `66_decrease_durability_amount.sql` | `decrease_durability` получает `p_amount`: износ снаряжения порциями (удар Левиафана снимает несколько единиц прочности) |
+| 67 | `67_cast_pipeline.sql` | конвейер заброса: `ensure_player`, `cast_bundle`, `resolve_cast` — одно чтение и одна запись на заброс; перечисленные выше RPC не меняются |
+| 68 | `68_sell_all_loot_counters.sql` | `sell_all_loot` считает `skipped` в порядке `sell.command.js`: сначала уникальные, тайные — из остатка |
+| 69 | `69_sell_all_loot_instance_unique.sql` | `sell_all_loot` признаёт уникальность и по `meta.unique` экземпляра: уникальная рыба не продаётся, даже если справочник `items` отстал |
 
 Чеклист по порядку — по строке на один запуск в SQL Editor:
 
@@ -101,6 +107,12 @@
 59_processed_message_actions_cleanup.sql
 60_player_catch_history.sql
 62_events_retention.sql
+64_leviathan.sql
+65_sell_all_loot.sql
+66_decrease_durability_amount.sql
+67_cast_pipeline.sql
+68_sell_all_loot_counters.sql
+69_sell_all_loot_instance_unique.sql
 ```
 
 `00_reset_db.sql` и `00b_backfill_migrations.sql` в чеклист не входят: первый нужен
@@ -121,18 +133,25 @@
 чистой базе не нужны. Номера в `migration_order` сохранили исходные значения,
 поэтому в списке есть пропуски.
 
-Шаги 63 и 64 удалены: 63 открывал кабинету чтение `player_catch_history`, а 64
-сразу его отменял. Вместе они ничего не создают, поэтому новой базе не нужны.
-Где они применялись, состояние уже такое же: прямого доступа к истории уловов
-нет, коллекция идёт через `my_caught_fish_ids`. Отметки об их запуске остаются
-в `schema_migrations`, а номер 65 в `migration_order` свободен для следующего шага.
+Шаги кабинета `63_player_catch_history_cabinet.sql` и
+`64_revert_player_catch_history_cabinet.sql` удалены: первый открывал кабинету
+чтение `player_catch_history`, второй сразу его отменял. Вместе они ничего не
+создают, поэтому новой базе не нужны. Где они применялись, состояние уже такое
+же: прямого доступа к истории уловов нет, коллекция идёт через
+`my_caught_fish_ids`. Отметки об их запуске остаются в `schema_migrations`.
+
+Это не шаг `64_leviathan.sql`: у него другой файл, другой `idx` и он живой.
+Номера `65…71` в `migration_order` заняты шагами `63_player_buffs`, `64_leviathan`,
+`65_sell_all_loot`, `66_decrease_durability_amount`, `67_cast_pipeline`,
+`68_sell_all_loot_counters` и `69_sell_all_loot_instance_unique`;
+следующий новый шаг берёт `idx` 72.
 
 ## Три ситуации
 
-**Новая (пустая) база.** `00` → `01…62` по порядку. `00b` не нужен.
+**Новая (пустая) база.** `00` → `01…67` по порядку. `00b` не нужен.
 
 **Решили начать с нуля.** Сначала `00_reset_db.sql` — он удаляет схему `public`
-со всем содержимым и возвращает ей права Supabase, потом `00` → `01…62`.
+со всем содержимым и возвращает ей права Supabase, потом `00` → `01…67`.
 Так база гарантированно соответствует файлам, без сверки того, что уже применено.
 Данные пропадут; аккаунты Supabase Auth (схема `auth`) остаются, но связка
 `accounts` (Twitch ID ↔ auth) создастся заново и её нужно будет заполнить входом в кабинет.
@@ -147,7 +166,7 @@
 иначе пропущенный шаг остался бы невыполненным, но закрытым от запуска.
 
 Если разбираться, какие шаги уже сделаны, не хочется — берите `00_reset_db.sql`
-и проходите `00` → `01…62` целиком.
+и проходите `00` → `01…67` целиком.
 
 ## Проверка после запуска
 
@@ -173,10 +192,16 @@ with checks(name, ok) as (values
     ('функция update_balance(...)',       to_regprocedure('public.update_balance(bigint,bigint,integer)') is not null),
     ('функция increment_stats(...)',      to_regprocedure('public.increment_stats(bigint,bigint,integer,integer)') is not null),
     ('функция add_item_to_inventory(...)', to_regprocedure('public.add_item_to_inventory(bigint,bigint,text,public.item_kind,integer,jsonb,text,boolean,boolean)') is not null),
-    ('функция decrease_durability(...)',  to_regprocedure('public.decrease_durability(bigint,bigint,boolean,text)') is not null),
+    ('функция decrease_durability(...)',  to_regprocedure('public.decrease_durability(bigint,bigint,boolean,text,integer)') is not null),
     ('cleanup_catches(integer)',          to_regprocedure('public.cleanup_catches(integer)') is not null),
     ('cleanup_events(integer)',           to_regprocedure('public.cleanup_events(integer)') is not null),
     ('cleanup_processed_message_actions(integer)', to_regprocedure('public.cleanup_processed_message_actions(integer)') is not null),
+    ('таблица leviathan_hunts',           to_regclass('public.leviathan_hunts') is not null),
+    ('таблица leviathan_damage',          to_regclass('public.leviathan_damage') is not null),
+    ('leviathan_line_damage(...)',        to_regprocedure('public.leviathan_line_damage(bigint,bigint,integer)') is not null),
+    ('ensure_player(bigint,bigint,text)', to_regprocedure('public.ensure_player(bigint,bigint,text)') is not null),
+    ('cast_bundle(bigint,bigint)',        to_regprocedure('public.cast_bundle(bigint,bigint)') is not null),
+    ('resolve_cast(...)',                 to_regprocedure('public.resolve_cast(bigint,bigint,text,jsonb,jsonb,integer,integer,boolean)') is not null),
     ('таблица catches',                   to_regclass('public.catches') is not null),
     ('таблица events',                    to_regclass('public.events') is not null),
     ('таблица player_chances',            to_regclass('public.player_chances') is not null),
@@ -196,6 +221,7 @@ with checks(name, ok) as (values
     ('sell_price_of(...)',                to_regprocedure('public.sell_price_of(text,public.item_kind,jsonb,integer,timestamptz)') is not null),
     ('inventory_sell_prices(bigint,bigint)', to_regprocedure('public.inventory_sell_prices(bigint,bigint)') is not null),
     ('sell_item(bigint,integer,text)',    to_regprocedure('public.sell_item(bigint,integer,text)') is not null),
+    ('sell_all_loot(bigint,bigint,text)', to_regprocedure('public.sell_all_loot(bigint,bigint,text)') is not null),
     ('repair_item(bigint,text)',          to_regprocedure('public.repair_item(bigint,text)') is not null),
     ('repair_cost_of(numeric,numeric,numeric)', to_regprocedure('public.repair_cost_of(numeric,numeric,numeric)') is not null),
     ('cleanse_artifact(bigint,text,text)', to_regprocedure('public.cleanse_artifact(bigint,text,text)') is not null),
@@ -241,7 +267,14 @@ with checks(name, ok) as (values
         where n.nspname = 'public' and p.proname = 'buy_artifact') = 1),
     ('inventory_sell_prices без перегрузок', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public' and p.proname = 'inventory_sell_prices') = 1),
+    ('sell_all_loot без перегрузок', (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+        where n.nspname = 'public' and p.proname = 'sell_all_loot') = 1),
 
+    ('sell_all_loot доступен authenticated и service_role', case when to_regprocedure('public.sell_all_loot(bigint,bigint,text)') is null then false
+        else has_function_privilege('authenticated', 'public.sell_all_loot(bigint,bigint,text)', 'execute')
+         and has_function_privilege('service_role', 'public.sell_all_loot(bigint,bigint,text)', 'execute') end),
+    ('sell_all_loot закрыт для anon', case when to_regprocedure('public.sell_all_loot(bigint,bigint,text)') is null then false
+        else not has_function_privilege('anon', 'public.sell_all_loot(bigint,bigint,text)', 'execute') end),
     -- доступы
     ('items закрыт для authenticated', case when to_regclass('public.items') is null then false
         else not has_table_privilege('authenticated', 'public.items', 'select') end),

@@ -37,7 +37,8 @@ comment on table public.migration_order is
 -- Набор шагов для чистой базы: 42 файла. Номера idx сохранили исходные
 -- значения, поэтому в списке есть пропуски — это шаги, которые целиком
 -- переписаны более поздними и удалены (см. delete ниже). Следующий новый шаг
--- берёт idx 65: он свободен и на этой, и на уже применённой базе.
+-- берёт idx 72: 65 занят шагом 63, 66 — шагом 64, 67 — шагом 65, 68 — шагом 66,
+-- 69 — шагом 67, 70 — шагом 68, 71 — шагом 69.
 insert into public.migration_order (idx, filename) values
     (1,  '01_items.sql'),
     (2,  '02_items_seed.sql'),
@@ -81,7 +82,13 @@ insert into public.migration_order (idx, filename) values
     (61, '59_processed_message_actions_cleanup.sql'),
     (62, '60_player_catch_history.sql'),
     (64, '62_events_retention.sql'),
-    (65, '63_player_buffs.sql')
+    (65, '63_player_buffs.sql'),
+    (66, '64_leviathan.sql'),
+    (67, '65_sell_all_loot.sql'),
+    (68, '66_decrease_durability_amount.sql'),
+    (69, '67_cast_pipeline.sql'),
+    (70, '68_sell_all_loot_counters.sql'),
+    (71, '69_sell_all_loot_instance_unique.sql')
 on conflict (idx) do update set filename = excluded.filename;
 
 -- Шаги, которых больше нет: их содержимое перенесено в более поздние файлы
@@ -146,7 +153,7 @@ delete from public.migration_order o
      '64_revert_player_catch_history_cabinet.sql'
  );
 
--- Новый шаг: впишите строку в insert выше (idx 65 и далее) и создайте файл.
+-- Новый шаг: впишите строку в insert выше (idx 68 и далее) и создайте файл.
 -- Файл, которого нет в списке, assert_migration не пропустит.
 
 -- ---------------------------------------------------------------------------
